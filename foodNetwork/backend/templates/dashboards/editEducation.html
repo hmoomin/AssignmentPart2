@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Edit Educational Content</h2>
+
+<form id="form">
+
+<select id="content_type">
+<option value="recipe">Recipe</option>
+<option value="storage">Storage</option>
+<option value="story">Story</option>
+</select><br>
+
+<input id="title"><br>
+<textarea id="content"></textarea><br>
+
+<button>Save</button>
+
+</form>
+
+<script>
+const id = window.location.pathname.split("/")[3];
+
+// Load
+fetch(`/api/products/education/${id}/`, { credentials: "include" })
+.then(res => res.json())
+.then(e => {
+    title.value = e.title;
+    content.value = e.content;
+    content_type.value = e.content_type;
+});
+
+// Save
+form.onsubmit = e => {
+    e.preventDefault();
+
+    fetch(`/api/products/education/${id}/`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+            title: title.value,
+            content: content.value,
+            content_type: content_type.value
+        })
+    })
+    .then(() => {
+        alert("Updated!");
+        window.location.href = "/api/orders/dashboard/producer/view/";
+    });
+};
+</script>
+
+</body>
+</html>

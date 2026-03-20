@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Add Product</title>
+</head>
+
+<body>
+
+<h2>Add New Product</h2>
+
+<form id="productForm">
+
+<input type="text" name="name" placeholder="Product Name" required><br>
+<textarea name="description" placeholder="Description"></textarea><br>
+<input type="number" step="0.01" name="price" placeholder="Price" required><br>
+
+<select name="category">
+    <option value="vegetables">Vegetables</option>
+    <option value="dairy">Dairy</option>
+    <option value="bakery">Bakery</option>
+    <option value="preserves">Preserves</option>
+    <option value="seasonal">Seasonal</option>
+</select><br>
+
+<label>Organic:</label>
+<input type="checkbox" name="is_organic"><br>
+
+<textarea name="allergen_info" placeholder="Allergen Info"></textarea><br>
+
+<label>Best Before:</label>
+<input type="date" name="best_before_date"><br>
+
+<label>Available From:</label>
+<input type="date" name="available_from"><br>
+
+<label>Available To:</label>
+<input type="date" name="available_to"><br>
+
+<label>Stock Quantity:</label>
+<input type="number" name="stock_quantity"><br>
+
+<button type="submit">Create Product</button>
+
+</form>
+
+<script>
+document.getElementById("productForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    const data = {
+        name: this.name.value,
+        description: this.description.value,
+        price: this.price.value,
+        category: this.category.value,
+        is_organic: this.is_organic.checked,
+        allergen_info: this.allergen_info.value,
+        best_before_date: this.best_before_date.value || null,
+        available_from: this.available_from.value || null,
+        available_to: this.available_to.value || null,
+        stock_quantity: this.stock_quantity.value || 0
+    };
+
+    fetch("/api/products/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify(data)
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Failed");
+        return res.json();
+    })
+    .then(() => {
+        alert("Product created!");
+        window.location.href = "/api/orders/dashboard/producer/view/";
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Error creating product");
+    });
+});
+</script>
+
+</body>
+</html>

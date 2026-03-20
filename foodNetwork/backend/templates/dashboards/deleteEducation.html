@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Delete Educational Content?</h2>
+
+<button id="deleteBtn">Yes Delete</button>
+<a href="/api/orders/dashboard/producer/view/"><button>Cancel</button></a>
+
+<script>
+const id = window.location.pathname.split("/")[3];
+
+deleteBtn.onclick = () => {
+    fetch(`/api/products/education/${id}/`, {
+        method: "DELETE",
+        credentials: "include"
+    })
+    .then(() => {
+        alert("Deleted!");
+        window.location.href = "/api/orders/dashboard/producer/view/";
+    });
+};
+</script>
+
+</body>
+</html>

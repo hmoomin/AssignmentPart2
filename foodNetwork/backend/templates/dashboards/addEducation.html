@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Add Educational Content</title>
+</head>
+
+<body>
+
+<h2>Add Educational Content</h2>
+
+<form id="eduForm">
+
+<select name="content_type">
+    <option value="recipe">Recipe</option>
+    <option value="storage">Storage Guidance</option>
+    <option value="story">Farm Story</option>
+</select><br>
+
+<input type="text" name="title" placeholder="Title"><br>
+<textarea name="content" placeholder="Content"></textarea><br>
+
+<button type="submit">Add Content</button>
+
+</form>
+
+<script>
+document.getElementById("eduForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+
+    const data = {
+        content_type: this.content_type.value,
+        title: this.title.value,
+        content: this.content.value
+    };
+
+    fetch("/api/products/education/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify(data)
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Failed");
+        return res.json();
+    })
+    .then(() => {
+        alert("Content added!");
+        window.location.href = "/api/orders/dashboard/producer/view/";
+    })
+    .catch(() => alert("Error creating content"));
+});
+</script>
+</body>
+</html>

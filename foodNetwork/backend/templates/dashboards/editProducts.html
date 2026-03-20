@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head><title>Edit Product</title></head>
+<body>
+
+<h2>Edit Product</h2>
+
+<form id="form">
+
+<input id="name"><br>
+<textarea id="description"></textarea><br>
+<input type="number" step="0.01" id="price"><br>
+
+<select id="category">
+<option value="vegetables">Vegetables</option>
+<option value="dairy">Dairy</option>
+<option value="bakery">Bakery</option>
+<option value="preserves">Preserves</option>
+<option value="seasonal">Seasonal</option>
+</select><br>
+
+<label>Organic</label>
+<input type="checkbox" id="is_organic"><br>
+
+<textarea id="allergen_info"></textarea><br>
+
+<input type="date" id="best_before_date"><br>
+<input type="date" id="available_from"><br>
+<input type="date" id="available_to"><br>
+
+<input type="number" id="stock_quantity"><br>
+
+<button>Save</button>
+
+</form>
+
+<script>
+const id = window.location.pathname.split("/")[3];
+
+// Load
+fetch(`/api/products/${id}/`, { credentials: "include" })
+.then(res => res.json())
+.then(p => {
+    name.value = p.name;
+    description.value = p.description;
+    price.value = p.price;
+    category.value = p.category;
+    is_organic.checked = p.is_organic;
+    allergen_info.value = p.allergen_info;
+    best_before_date.value = p.best_before_date;
+    available_from.value = p.available_from;
+    available_to.value = p.available_to;
+    stock_quantity.value = p.stock_quantity;
+});
+
+// Save
+form.onsubmit = e => {
+    e.preventDefault();
+
+    fetch(`/api/products/${id}/`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+            name: name.value,
+            description: description.value,
+            price: price.value,
+            category: category.value,
+            is_organic: is_organic.checked,
+            allergen_info: allergen_info.value,
+            best_before_date: best_before_date.value,
+            available_from: available_from.value,
+            available_to: available_to.value,
+            stock_quantity: stock_quantity.value
+        })
+    })
+    .then(() => {
+        alert("Updated!");
+        window.location.href = "/api/orders/dashboard/producer/view/";
+    });
+};
+</script>
+
+</body>
+</html>

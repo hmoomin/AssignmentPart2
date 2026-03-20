@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Customer Dashboard</title>
+</head>
+
+<body>
+<div style="background:#2e7d32;color:white;padding:15px;">
+<span> Welcome {{ request.user.username }}</span>
+<a href="/change-password/" style="margin-left:20px;color:white;">
+Change Password
+</a>
+<a href="/logout/" style="float:right;color:white;">Logout</a>
+</div>
+
+<h1>Customer Dashboard</h1>
+
+<h2>Your Cart</h2>
+<ul id="cart"></ul>
+
+<h2>Your Orders</h2>
+<ul id="orders"></ul>
+
+<script>
+
+fetch("/api/orders/dashboard/customer/")
+.then(response => response.json())
+.then(data => {
+
+    const cart = document.getElementById("cart");
+
+    data.cart_items.forEach(item => {
+        let li = document.createElement("li");
+        li.textContent =
+            item.product + " x " + item.quantity;
+        cart.appendChild(li);
+    });
+
+    const orders = document.getElementById("orders");
+
+    data.orders.forEach(order => {
+        let li = document.createElement("li");
+        li.textContent =
+            order.product + " x " + order.quantity;
+        orders.appendChild(li);
+    });
+
+});
+
+</script>
+
+</body>
+
+</html>

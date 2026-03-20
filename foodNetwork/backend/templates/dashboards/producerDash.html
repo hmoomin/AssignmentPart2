@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Producer Dashboard</title>
+</head>
+<body>
+<div style="background:#2e7d32;color:white;padding:15px;">
+<span> Welcome {{ request.user.username }}</span>
+<a href="/change-password/" style="margin-left:20px;color:white;">
+Change Password
+</a>
+<a href="/logout/" style="float:right;color:white;">Logout</a>
+</div>
+
+<h1>Producer Dashboard</h1>
+
+<h2>Actions</h2>
+
+<a href="/producer/add-product/">
+    <button>Add Product</button>
+</a>
+
+<a href="/producer/add-education/">
+    <button>Add Educational Content</button>
+</a>
+
+<h2>Educational Content</h2>
+<ul id="education"></ul>
+
+<div id="eduFormContainer" style="display:none;">
+    <h3>Edit Educational Content</h3>
+
+    <form id="eduForm">
+        <input type="hidden" id="eduId">
+
+        <select id="content_type">
+            <option value="recipe">Recipe</option>
+            <option value="storage">Storage</option>
+            <option value="story">Story</option>
+        </select><br>
+
+        <input type="text" id="eduTitle"><br>
+        <textarea id="eduContent"></textarea><br>
+
+        <button type="submit">Save</button>
+    </form>
+</div>
+
+<h2>Your Products</h2>
+<ul id="products"></ul>
+
+<div id="editFormContainer" style="display:none;">
+    <h3>Edit Product</h3>
+
+    <form id="editForm">
+        <input type="hidden" id="productId">
+
+        <input type="text" id="name" placeholder="Name"><br>
+        <textarea id="description" placeholder="Description"></textarea><br>
+        <input type="number" step="0.01" id="price" placeholder="Price"><br>
+
+        <select id="category">
+            <option value="vegetables">Vegetables</option>
+            <option value="dairy">Dairy</option>
+            <option value="bakery">Bakery</option>
+            <option value="preserves">Preserves</option>
+            <option value="seasonal">Seasonal</option>
+        </select><br>
+
+        <label>Organic:</label>
+        <input type="checkbox" id="is_organic"><br>
+
+        <textarea id="allergen_info" placeholder="Allergen Info"></textarea><br>
+
+        <label>Best Before:</label>
+        <input type="date" id="best_before_date"><br>
+
+        <label>Available From:</label>
+        <input type="date" id="available_from"><br>
+
+        <label>Available To:</label>
+        <input type="date" id="available_to"><br>
+
+        <label>Stock:</label>
+        <input type="number" id="stock_quantity"><br>
+
+        <button type="submit">Save Changes</button>
+    </form>
+</div>
+
+<h2>Orders</h2>
+<ul id="orders"></ul>
+
+<h2>Total Sales</h2>
+<p id="sales"></p>
+
+<script>
+// ================= PRODUCTS =================
+fetch("/api/products/", { credentials: "include" })
+.then(res => res.json())
+.then(data => {
+
+    const list = document.getElementById("products");
+    list.innerHTML = "";
+
+    data.forEach(product => {
+        const li = document.createElement("li");
+
+        li.innerHTML = `
+            ${product.name} - £${product.price}
+            <a href="/producer/edit-product/${product.id}/">
+                <button>Edit</button>
+            </a>
+            <a href="/producer/delete-product/${product.id}/">
+                <button>Delete</button>
+            </a>
+        `;
+
+        list.appendChild(li);
+    });
+});
+
+
+// ================= EDUCATIONAL CONTENT =================
+fetch("/api/products/education/", { credentials: "include" })
+.then(res => res.json())
+.then(data => {
+
+    const list = document.getElementById("education");
+    list.innerHTML = "";
+
+    data.forEach(item => {
+        const li = document.createElement("li");
+
+        li.innerHTML = `
+            ${item.title}
+            <a href="/producer/edit-education/${item.id}/">
+                <button>Edit</button>
+            </a>
+            <a href="/producer/delete-education/${item.id}/">
+                <button>Delete</button>
+            </a>
+        `;
+
+        list.appendChild(li);
+    });
+});
+</script>
+</body>
+</html>
