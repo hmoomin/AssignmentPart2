@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+<input type="hidden" id="csrfToken" value="{{ csrf_token }}">    
 <body>
 
 <h2>Delete Product?</h2>
@@ -9,10 +10,11 @@
 
 <script>
 const id = window.location.pathname.split("/")[3];
-
+const csrfToken = document.getElementById("csrfToken").value;
 deleteBtn.onclick = () => {
     fetch(`/api/products/${id}/`, {
         method: "DELETE",
+        headers: { "X-CSRFToken": csrfToken },
         credentials: "include"
     })
     .then(() => {

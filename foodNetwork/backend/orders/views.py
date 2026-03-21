@@ -8,14 +8,14 @@ from .models import Cart, Order, OrderItem, CartItem
 from users.models import User
 from .utils import calculate_distance
 from rest_framework.exceptions import ValidationError
-from products.models import Product
+from products.models import Product, EducationalContent
 from products.serializers import ProductSerializer
 from django.db.models import Avg, Sum, Count
 from rest_framework.permissions import IsAdminUser
 from .serializers import OrderItemSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from datetime import datetime, timedelta
 
@@ -234,14 +234,28 @@ def add_product_page(request):
 def add_education_page(request):
     return render(request, "dashboards/addEducation.html")
 
-def edit_product_page(request, id):
-    return render(request, "dashboards/editProduct.html", {"id": id})
+def edit_product_page(request, pk):
+    product = get_object_or_404(Product, pk=pk, producer=request.user)
+    return render(request, "dashboards/editProducts.html", {"product": product})
 
-def delete_product_page(request, id):
-    return render(request, "dashboards/deleteProduct.html", {"id": id})
+def delete_product_page(request, pk):
+    product = get_object_or_404(Product, pk=pk, producer=request.user)
 
-def edit_education_page(request, id):
-    return render(request, "dashboards/editEducation.html", {"id": id})
+    if request.method == "POST":
+        product.delete()
+        return redirect("/api/orders/dashboard/producer/view/")
 
-def delete_education_page(request, id):
-    return render(request, "dashboards/deleteEducation.html", {"id": id})
+    return render(request, "dashboards/deleteProducts.html", {"product": product})
+
+def edit_education_page(request, pk):
+    content = get_object_or_404(EducationalContent, pk=pk, producer=request.user)
+    return render(request, "dashboards/editEducation.html", {"content": content})
+
+def delete_education_page(request, pk):
+    content = get_object_or_404(EducationalContent, pk=pk, producer=request.user)
+
+    if request.method == "POST":
+        content.delete()
+        return redirect("/api/orders/dashboard/producer/view/")
+
+    return render(request, "dashboards/deleteEducation.html", {"content": content})

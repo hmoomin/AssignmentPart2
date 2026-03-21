@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head><title>Edit Product</title></head>
+<input type="hidden" id="csrfToken" value="{{ csrf_token }}">
 <body>
 
 <h2>Edit Product</h2>
@@ -36,7 +37,7 @@
 
 <script>
 const id = window.location.pathname.split("/")[3];
-
+const csrfToken = document.getElementById("csrfToken").value;
 // Load
 fetch(`/api/products/${id}/`, { credentials: "include" })
 .then(res => res.json())
@@ -59,7 +60,7 @@ form.onsubmit = e => {
 
     fetch(`/api/products/${id}/`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
         credentials: "include",
         body: JSON.stringify({
             name: name.value,

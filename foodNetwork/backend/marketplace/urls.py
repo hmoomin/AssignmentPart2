@@ -16,7 +16,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from users.views import login_home, customer_login, producer_login, logout_user, change_password
-from orders.views import add_product_page, add_education_page
+from orders.views import add_product_page, add_education_page, edit_product_page, delete_product_page, edit_education_page, delete_education_page
 
 urlpatterns = [
     path("", login_home),
@@ -31,4 +31,8 @@ urlpatterns = [
     path("logout/", logout_user),
     path("producer/add-product/", add_product_page),
     path("producer/add-education/", add_education_page),
+    path("producer/edit-product/<int:pk>/", edit_product_page),
+    path("producer/delete-product/<int:pk>/", delete_product_page),
+    path("producer/edit-education/<int:pk>/", edit_education_page),
+    path("producer/delete-education/<int:pk>/", delete_education_page),
 ]
