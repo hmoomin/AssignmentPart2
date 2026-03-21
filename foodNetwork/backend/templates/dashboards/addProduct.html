@@ -3,7 +3,7 @@
 <head>
 <title>Add Product</title>
 </head>
-
+<input type="hidden" id="csrfToken" value="{{ csrf_token }}">
 <body>
 
 <h2>Add New Product</h2>
@@ -60,26 +60,33 @@ document.getElementById("productForm").addEventListener("submit", function(e) {
         stock_quantity: this.stock_quantity.value || 0
     };
 
+    const csrfToken = document.getElementById("csrfToken").value;
+
     fetch("/api/products/", {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json", 
+            "X-CSRFToken": csrfToken
         },
         credentials: "include",
         body: JSON.stringify(data)
     })
-    .then(res => {
-        if (!res.ok) throw new Error("Failed");
-        return res.json();
+    .then(async res => {
+        const responseData = await res.json();
+
+        if (!res.ok) {
+            console.error("BACKEND ERROR:", responseData);
+            alert(JSON.stringify(responseData));
+            throw new Error("Failed");
+        }
+
+        return responseData;
     })
     .then(() => {
         alert("Product created!");
         window.location.href = "/api/orders/dashboard/producer/view/";
     })
-    .catch(err => {
-        console.error(err);
-        alert("Error creating product");
-    });
+    .catch(err => console.error(err));
 });
 </script>
 
