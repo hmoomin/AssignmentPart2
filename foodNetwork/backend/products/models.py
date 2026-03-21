@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
@@ -67,12 +67,13 @@ class Product(models.Model):
         if self.best_before_date:
             days_left = (self.best_before_date - timezone.now().date()).days
             if days_left <= 2:
-                Discount.objects.create(
-                    product=self,
-                    discount_percentage=30,
-                    start_date=timezone.now(),
-                    end_date=timezone.now() + timedelta(days=2)
-                )
+                if not self.discount_set.exists():
+                    Discount.objects.create(
+                        product=self,
+                        discount_percentage=30,
+                        start_date=timezone.now(),
+                        end_date=timezone.now() + timedelta(days=2)
+                    )
 
 
 class Discount(models.Model):

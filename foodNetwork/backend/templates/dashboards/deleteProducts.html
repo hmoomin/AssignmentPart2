@@ -1,25 +1,42 @@
 <!DOCTYPE html>
 <html>
-<input type="hidden" id="csrfToken" value="{{ csrf_token }}">    
 <body>
+
+<input type="hidden" id="csrfToken" value="{{ csrf_token }}">
 
 <h2>Delete Product?</h2>
 
 <button id="deleteBtn">Yes Delete</button>
-<a href="/api/orders/dashboard/producer/view/"><button>Cancel</button></a>
+<a href="/api/orders/dashboard/producer/view/">
+    <button>Cancel</button>
+</a>
 
 <script>
-const id = window.location.pathname.split("/")[3];
+const id = window.location.pathname.split("/").filter(Boolean).pop();
 const csrfToken = document.getElementById("csrfToken").value;
-deleteBtn.onclick = () => {
+
+document.getElementById("deleteBtn").onclick = () => {
+
     fetch(`/api/products/${id}/`, {
         method: "DELETE",
-        headers: { "X-CSRFToken": csrfToken },
+        headers: {
+            "X-CSRFToken": csrfToken
+        },
         credentials: "include"
+    })
+    .then(res => {
+        if (!res.ok) {
+            throw new Error("Delete failed");
+        }
+        return res.text();
     })
     .then(() => {
         alert("Deleted!");
         window.location.href = "/api/orders/dashboard/producer/view/";
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Delete failed - check console");
     });
 };
 </script>

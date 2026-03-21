@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head><title>Edit Product</title></head>
-<input type="hidden" id="csrfToken" value="{{ csrf_token }}">
+
 <body>
+
+<input type="hidden" id="csrfToken" value="{{ csrf_token }}">
 
 <h2>Edit Product</h2>
 
@@ -36,43 +38,60 @@
 </form>
 
 <script>
-const id = window.location.pathname.split("/")[3];
+const id = window.location.pathname.split("/").filter(Boolean).pop();
 const csrfToken = document.getElementById("csrfToken").value;
-// Load
+const form = document.getElementById("form");
+
+// Inputs
+const nameInput = document.getElementById("name");
+const descriptionInput = document.getElementById("description");
+const priceInput = document.getElementById("price");
+const categoryInput = document.getElementById("category");
+const organicInput = document.getElementById("is_organic");
+const allergenInput = document.getElementById("allergen_info");
+const bestBeforeInput = document.getElementById("best_before_date");
+const fromInput = document.getElementById("available_from");
+const toInput = document.getElementById("available_to");
+const stockInput = document.getElementById("stock_quantity");
+
+// LOAD PRODUCT
 fetch(`/api/products/${id}/`, { credentials: "include" })
 .then(res => res.json())
 .then(p => {
-    name.value = p.name;
-    description.value = p.description;
-    price.value = p.price;
-    category.value = p.category;
-    is_organic.checked = p.is_organic;
-    allergen_info.value = p.allergen_info;
-    best_before_date.value = p.best_before_date;
-    available_from.value = p.available_from;
-    available_to.value = p.available_to;
-    stock_quantity.value = p.stock_quantity;
+    nameInput.value = p.name;
+    descriptionInput.value = p.description;
+    priceInput.value = p.price;
+    categoryInput.value = p.category;
+    organicInput.checked = p.is_organic;
+    allergenInput.value = p.allergen_info;
+    bestBeforeInput.value = p.best_before_date;
+    fromInput.value = p.available_from;
+    toInput.value = p.available_to;
+    stockInput.value = p.stock_quantity;
 });
 
-// Save
+// SAVE
 form.onsubmit = e => {
     e.preventDefault();
 
     fetch(`/api/products/${id}/`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken
+        },
         credentials: "include",
         body: JSON.stringify({
-            name: name.value,
-            description: description.value,
-            price: price.value,
-            category: category.value,
-            is_organic: is_organic.checked,
-            allergen_info: allergen_info.value,
-            best_before_date: best_before_date.value,
-            available_from: available_from.value,
-            available_to: available_to.value,
-            stock_quantity: stock_quantity.value
+            name: nameInput.value,
+            description: descriptionInput.value,
+            price: priceInput.value,
+            category: categoryInput.value,
+            is_organic: organicInput.checked,
+            allergen_info: allergenInput.value,
+            best_before_date: bestBeforeInput.value,
+            available_from: fromInput.value,
+            available_to: toInput.value,
+            stock_quantity: stockInput.value
         })
     })
     .then(() => {

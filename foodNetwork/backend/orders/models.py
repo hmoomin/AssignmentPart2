@@ -25,7 +25,7 @@ class CartItem(models.Model):
 class Order(models.Model):
     customer = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
-    delivery_date = models.DateTimeField(timezone.now())
+    delivery_date = models.DateTimeField(default=timezone.now())
 
     STATUS_PENDING = "pending"
     STATUS_PAID = "paid"

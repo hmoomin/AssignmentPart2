@@ -3,7 +3,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
 from rest_framework.response import Response
-
 from .models import Product, EducationalContent
 from .serializers import ProductSerializer, EducationalContentSerializer
 from orders.utils import calculate_distance
