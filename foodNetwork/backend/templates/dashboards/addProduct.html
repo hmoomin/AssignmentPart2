@@ -44,6 +44,14 @@
 </form>
 
 <script>
+// Date Restrictions
+const today = new Date().toISOString().split("T")[0];
+
+document.querySelector('[name="best_before_date"]').min = today;
+document.querySelector('[name="available_from"]').min = today;
+document.querySelector('[name="available_to"]').min = today;
+
+// Form Submit 
 document.getElementById("productForm").addEventListener("submit", function(e) {
     e.preventDefault();
 

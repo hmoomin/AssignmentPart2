@@ -54,6 +54,13 @@ const fromInput = document.getElementById("available_from");
 const toInput = document.getElementById("available_to");
 const stockInput = document.getElementById("stock_quantity");
 
+// Date Restrictions
+const today = new Date().toISOString().split("T")[0];
+
+bestBeforeInput.min = today;
+fromInput.min = today;
+toInput.min = today;
+
 // LOAD PRODUCT
 fetch(`/api/products/${id}/`, { credentials: "include" })
 .then(res => res.json())
