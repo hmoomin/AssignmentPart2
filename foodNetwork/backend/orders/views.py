@@ -16,6 +16,7 @@ from .serializers import OrderItemSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from datetime import datetime, timedelta
 
@@ -89,46 +90,6 @@ class ProducerOrdersView(APIView):
         serializer = OrderItemSerializer(orders, many=True)
 
         return Response(serializer.data)
-    
-class CustomerDashboardView(APIView):
-
-    def get(self, request):
-
-        user = request.user
-
-        cart, created = Cart.objects.get_or_create(user=user)
-
-        cart_items = cart.items.all()
-        orders = Order.objects.filter(customer=user)
-
-        cart_data = CartItemSerializer(cart_items, many=True).data
-        order_data = OrderItemSerializer(
-            OrderItem.objects.filter(order__customer=user),
-            many=True
-        ).data
-
-        return Response({
-            "cart_items": cart_data,
-            "orders": order_data
-        })
-    
-class ProducerDashboardView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        producer = request.user
-
-        if not producer.is_producer:
-            return Response({"error": "Not allowed"}, status=403)
-
-        products = Product.objects.filter(producer=producer)
-        orders = OrderItem.objects.filter(producer=producer)
-
-        return Response({
-            "products": ProductSerializer(products, many=True).data,
-            "orders": OrderItemSerializer(orders, many=True).data,
-            "total_sales": sum(o.price * o.quantity for o in orders)
-        })
     
 class SustainabilityReportView(APIView):
 
@@ -221,29 +182,56 @@ class ProducerDashboardView(APIView):
             "total_sales": total_sales
         })
     
+@login_required
 def producer_dashboard_page(request):
+
+    if not request.user.is_producer:
+        return redirect("/login/")
+
     return render(request, "dashboards/producerDash.html")
 
 
+@login_required
 def customer_dashboard_page(request):
+
+    if request.user.is_producer:
+        return redirect("/api/orders/dashboard/producer/view/")
+
     return render(request, "dashboards/customerDash.html")
 
+@login_required
 def add_product_page(request):
+
+    if not request.user.is_producer:
+        return redirect("/login/")
+
     return render(request, "dashboards/addProduct.html")
 
+@login_required
 def add_education_page(request):
+
+    if not request.user.is_producer:
+        return redirect("/login/")
+
     return render(request, "dashboards/addEducation.html")
 
+@login_required
 def edit_product_page(request, pk):
+
+    if not request.user.is_producer:
+        return redirect("/login/")
+
     product = get_object_or_404(Product, pk=pk, producer=request.user)
+
     return render(request, "dashboards/editProducts.html", {"product": product})
 
+@login_required
 def delete_product_page(request, pk):
-    product = get_object_or_404(Product, pk=pk, producer=request.user)
 
-    if request.method == "POST":
-        product.delete()
-        return redirect("/api/orders/dashboard/producer/view/")
+    if not request.user.is_producer:
+        return redirect("/login/")
+
+    product = get_object_or_404(Product, pk=pk, producer=request.user)
 
     return render(request, "dashboards/deleteProducts.html", {"product": product})
 

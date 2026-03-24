@@ -4,6 +4,7 @@ from .serializers import UserSerializer
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth import update_session_auth_hash
 
@@ -16,47 +17,41 @@ class RegisterView(generics.CreateAPIView):
 def login_home(request):
     return render(request, "dashboards/login.html")
 
-
-def customer_login(request):
-
-    error = None
+@csrf_protect
+def login_view(request):
 
     if request.method == "POST":
 
-        username = request.POST["username"]
-        password = request.POST["password"]
+        username = request.POST.get("username")
+        password = request.POST.get("password")
 
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
+
             login(request, user)
+
+            if user.is_superuser:
+                return redirect("/admin/")
+
+            if user.is_producer:
+                return redirect("/api/orders/dashboard/producer/view/")
+
             return redirect("/api/orders/dashboard/customer/view/")
-        else:
-            error = "Invalid username or password"
 
-    return render(request, "dashboards/customerLogin.html", {"error": error})
+        return render(
+            request,
+            "dashboards/login.html",
+            {"error": "Invalid username or password"}
+        )
 
-
-def producer_login(request):
-
-    if request.method == "POST":
-
-        username = request.POST["username"]
-        password = request.POST["password"]
-
-        user = authenticate(request, username=username, password=password)
-
-        if user is not None and user.is_producer:
-            login(request, user)
-            return redirect("/api/orders/dashboard/producer/view/")
-
-    return render(request, "dashboards/producerLogin.html")
+    return render(request, "dashboards/login.html")
 
 def logout_user(request):
 
     logout(request)
 
-    return redirect("/")
+    return redirect("/login/")
 
 @login_required
 def change_password(request):
