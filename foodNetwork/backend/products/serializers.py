@@ -11,3 +11,4 @@ class EducationalContentSerializer(serializers.ModelSerializer):
     class Meta:
         model = EducationalContent
         fields = "__all__"
+        read_only_fields = ["producer"]

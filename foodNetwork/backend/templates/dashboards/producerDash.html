@@ -133,7 +133,7 @@ fetch("/api/products/education/", { credentials: "include" })
         const li = document.createElement("li");
 
         li.innerHTML = `
-            ${item.title}
+            ${item.title} (${item.content_type})
             <a href="/producer/edit-education/${item.id}/">
                 <button>Edit</button>
             </a>

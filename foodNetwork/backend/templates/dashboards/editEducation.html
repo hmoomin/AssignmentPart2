@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <body>
+<input type="hidden" id="csrfToken" value="{{ csrf_token }}">
 
 <h2>Edit Educational Content</h2>
 
@@ -8,46 +9,67 @@
 
 <select id="content_type">
 <option value="recipe">Recipe</option>
-<option value="storage">Storage</option>
-<option value="story">Story</option>
+<option value="storage">Storage Guidance</option>
+<option value="story">Farm Story</option>
 </select><br>
 
-<input id="title"><br>
-<textarea id="content"></textarea><br>
+<input id="title" placeholder="Title"><br>
+
+<textarea id="content" placeholder="Content"></textarea><br>
 
 <button>Save</button>
 
 </form>
 
 <script>
-const id = window.location.pathname.split("/")[3];
+const id = window.location.pathname.split("/").filter(Boolean).pop();
+const csrfToken = document.getElementById("csrfToken").value;
+const form = document.getElementById("form");
 
-// Load
+// Inputs
+const typeInput = document.getElementById("content_type");
+const titleInput = document.getElementById("title");
+const contentInput = document.getElementById("content");
+
+// LOAD EDUCATIONAL CONTENT
 fetch(`/api/products/education/${id}/`, { credentials: "include" })
 .then(res => res.json())
-.then(e => {
-    title.value = e.title;
-    content.value = e.content;
-    content_type.value = e.content_type;
+.then(item => {
+    typeInput.value = item.content_type;
+    titleInput.value = item.title;
+    contentInput.value = item.content;
 });
 
-// Save
+// SAVE
 form.onsubmit = e => {
     e.preventDefault();
 
     fetch(`/api/products/education/${id}/`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken
+        },
         credentials: "include",
         body: JSON.stringify({
-            title: title.value,
-            content: content.value,
-            content_type: content_type.value
+            content_type: typeInput.value,
+            title: titleInput.value,
+            content: contentInput.value
         })
     })
+    .then(res => {
+        if (!res.ok) {
+            throw new Error("Update failed");
+        }
+        return res.json();
+    })
     .then(() => {
-        alert("Updated!");
+        alert("Educational content updated!");
         window.location.href = "/api/orders/dashboard/producer/view/";
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Update failed - check console");
     });
 };
 </script>

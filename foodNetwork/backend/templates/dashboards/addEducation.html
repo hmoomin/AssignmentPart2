@@ -44,15 +44,22 @@ document.getElementById("eduForm").addEventListener("submit", function(e) {
         credentials: "include",
         body: JSON.stringify(data)
     })
-    .then(res => {
-        if (!res.ok) throw new Error("Failed");
-        return res.json();
+    .then(async res => {
+        const responseData = await res.json();
+
+        if (!res.ok) {
+            console.error("BACKEND ERROR:", responseData);
+            alert(JSON.stringify(responseData));
+            throw new Error("Failed");
+        }
+
+        return responseData;
     })
     .then(() => {
         alert("Content added!");
         window.location.href = "/api/orders/dashboard/producer/view/";
     })
-    .catch(() => alert("Error creating content"));
+    .catch(err => console.error(err));
 });
 </script>
 </body>
