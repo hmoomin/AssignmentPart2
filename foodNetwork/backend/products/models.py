@@ -2,6 +2,8 @@ from django.db import models, transaction
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 User = settings.AUTH_USER_MODEL
 
@@ -74,7 +76,17 @@ class Product(models.Model):
                         start_date=timezone.now(),
                         end_date=timezone.now() + timedelta(days=2)
                     )
+    def clean(self):
+        today = timezone.now().date()
 
+        if self.best_before_date and self.best_before_date < today:
+            raise ValidationError("Best before date cannot be in the past.")
+
+        if self.available_from and self.available_from < today:
+            raise ValidationError("Available from date cannot be in the past.")
+
+        if self.available_to and self.available_to < today:
+            raise ValidationError("Available to date cannot be in the past.")
 
 class Discount(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
