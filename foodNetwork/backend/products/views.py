@@ -97,7 +97,6 @@ class ProductListView(generics.ListAPIView):
             best_before_date__isnull=False,
             best_before_date__lte=today + timedelta(days=2)
         )
-
         for product in expiring_products:
             product.auto_apply_expiry_discount()
 
@@ -109,7 +108,6 @@ class ProductListView(generics.ListAPIView):
 
         for i, product in enumerate(queryset):
             producer = product.producer
-
             if (
                 producer.latitude is not None and
                 producer.longitude is not None and
@@ -122,18 +120,12 @@ class ProductListView(generics.ListAPIView):
                     user.latitude,
                     user.longitude
                 )
-
-                # APPLY FILTER HERE
                 if max_distance and float(distance) > float(max_distance):
                     continue  # skip product
-
                 data[i]["food_miles"] = round(distance, 2)
-
             else:
                 data[i]["food_miles"] = None
-
             filtered_data.append(data[i])
-
         return Response(filtered_data)
 
 class ProductListCreateView(generics.ListCreateAPIView):
@@ -146,7 +138,6 @@ class ProductListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         if not self.request.user.is_producer:
             raise PermissionDenied("Only producers can create products")
-
         serializer.save(
             producer=self.request.user,
             origin_farm=self.request.data.get("origin_farm") or self.request.user.username
@@ -174,12 +165,10 @@ class LocalProductsView(APIView):
     def get(self, request):
         user = request.user
         products = Product.objects.all()
-
         product_distances = []
 
         for product in products:
             producer = product.producer
-
             if (
                 producer.latitude is not None
                 and producer.longitude is not None
@@ -194,7 +183,6 @@ class LocalProductsView(APIView):
                 )
             else:
                 distance = None
-
             product_distances.append((product, distance))
 
         product_distances.sort(key=lambda x: x[1] if x[1] else 999999)
@@ -207,7 +195,6 @@ class LocalProductsView(APIView):
 # ================= SEARCH ================= #
 
 class ProductSearchView(APIView):
-
     def get(self, request):
         query = request.GET.get("q", "")
         products = Product.objects.filter(name__icontains=query)
@@ -216,14 +203,12 @@ class ProductSearchView(APIView):
 
 class ProductFilterOptionsView(APIView):
     def get(self, request):
-
         # Clean category choices
         categories = [
             {"value": c[0], "label": c[1]}
             for c in Product.CATEGORY_CHOICES
             if c[0]  # filter out empty keys
         ]
-
         # Distinct producers WITH products
         producers = (
             User.objects
@@ -233,7 +218,6 @@ class ProductFilterOptionsView(APIView):
             .values("username")
             .distinct()
         )
-
         return Response({
             "categories": categories,
             "producers": list(producers)

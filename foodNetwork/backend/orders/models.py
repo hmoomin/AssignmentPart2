@@ -51,21 +51,14 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
-
-    # Reference (optional for integrity)
     product = models.ForeignKey("products.Product", on_delete=models.SET_NULL, null=True)
-
-    # SNAPSHOT FIELDS (critical)
     product_name = models.CharField(max_length=200, default="Unknown Product")
     producer = models.ForeignKey(User, on_delete=models.CASCADE)
     producer_name = models.CharField(max_length=200, default="Unknown Producer")
-
     quantity = models.PositiveIntegerField()
-
-    # Pricing snapshot
+    # Pricing 
     price = models.DecimalField(max_digits=8, decimal_places=3)
-
-    # Delivery snapshot
+    # Delivery 
     delivery_method = models.CharField(max_length=20, default="pickup")
     delivery_notes = models.TextField(blank=True)
 
@@ -102,9 +95,7 @@ class OrderItem(models.Model):
 class Payment(models.Model):
     producer = models.ForeignKey(User, on_delete=models.CASCADE)
     orders = models.ManyToManyField(OrderItem)
-
     amount = models.DecimalField(max_digits=10, decimal_places=3)
-
     created_at = models.DateTimeField(auto_now_add=True)
     is_paid = models.BooleanField(default=False)
 
@@ -143,9 +134,7 @@ class Notification(models.Model):
 class Settlement(models.Model):
     producer = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
-
     gross_sales = models.DecimalField(max_digits=10, decimal_places=2)
     platform_fee = models.DecimalField(max_digits=10, decimal_places=2)
     net_earnings = models.DecimalField(max_digits=10, decimal_places=2)
-
     items = models.ManyToManyField(OrderItem)

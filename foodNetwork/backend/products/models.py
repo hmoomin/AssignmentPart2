@@ -20,7 +20,6 @@ class Product(models.Model):
         ("preserves", "Preserves"),
         ("seasonal", "Seasonal"),
     ]
-
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
     # Product quality + compliance
     is_organic = models.BooleanField(default=False)
@@ -81,7 +80,6 @@ class Product(models.Model):
 
     def is_available(self):
         today = timezone.now().date()
-
         if self.is_recalled:
             return False
 
@@ -125,30 +123,23 @@ class Product(models.Model):
     def auto_apply_expiry_discount(self):
         if self.best_before_date:
             days_left = (self.best_before_date - timezone.now().date()).days
-
             active_discount = self.discount_set.filter(
                 end_date__gte=timezone.now()
             ).exists()
-
             if days_left <= 2 and not active_discount:
-
                 discount = Discount.objects.create(
                     product=self,
                     discount_percentage=30,
                     start_date=timezone.now(),
                     end_date=timezone.now() + timedelta(days=2)
                 )
-
                 users = User.objects.filter(is_producer=False)
-
                 for user in users:
-
                     already_notified = Notification.objects.filter(
                         user=user,
                         notification_type="discount",
                         message__icontains=self.name
                     ).exists()
-
                     if not already_notified:
                         Notification.objects.create(
                             user=user,
@@ -180,7 +171,6 @@ class Discount(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-
         # Sync to product
         self.product.discount_percentage = self.discount_percentage
         self.product.discount_end_date = self.end_date
@@ -192,7 +182,6 @@ class EducationalContent(models.Model):
         ("storage", "Storage"),
         ("story", "Farm Story"),
     ]
-
     producer = models.ForeignKey(User, on_delete=models.CASCADE)
     content_type = models.CharField(max_length=20, choices=CONTENT_TYPES)
     title = models.CharField(max_length=255)

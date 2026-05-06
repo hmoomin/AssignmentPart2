@@ -36,13 +36,11 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 class CheckoutView(APIView):
     permission_classes = [IsAuthenticated]
-
     @transaction.atomic
     def post(self, request):
-
         user = request.user
-
         cart = Cart.objects.filter(user=user).first()
+
         if not cart or not cart.items.exists():
             raise ValidationError("Cart is empty")
 
@@ -496,7 +494,6 @@ class WeeklySettlementView(APIView):
                 }
                 for item in items
             ]
-
             # mark as settled
             now = timezone.now()
             for item in items:
@@ -526,10 +523,8 @@ class WeeklySettlementView(APIView):
 
 class EnvironmentalReportView(APIView):
     permission_classes = [IsAuthenticated]
-
     def get(self, request, order_id):
         user = request.user
-
         try:
             order = Order.objects.get(id=order_id, customer=user)
         except Order.DoesNotExist:
@@ -543,7 +538,6 @@ class EnvironmentalReportView(APIView):
         for item in items:
             product = item.product
             producer = product.producer
-
             if (
                 producer.latitude is not None and
                 producer.longitude is not None and
@@ -587,18 +581,14 @@ class EnvironmentalReportView(APIView):
                 item["food_miles"],
                 item["subtotal"]
             ])
-
         writer.writerow([])
         writer.writerow(["TOTAL MILES", round(total_miles, 2)])
         writer.writerow(["TOTAL CO2 (kg)", round(total_co2, 2)])
-
         return response
     
 class CustomerDashboardView(APIView):
-
     def get(self, request):
         user = request.user
-
         cart, _ = Cart.objects.get_or_create(user=user)
         cart_items = cart.items.all()
         orders = OrderItem.objects.filter(order__customer=user)
@@ -616,14 +606,10 @@ class CustomerDashboardView(APIView):
 
 
 class ProducerDashboardView(APIView):
-
     authentication_classes = [SessionAuthentication, BasicAuthentication]
     permission_classes = [IsAuthenticated]
-
     def get(self, request):
-
         producer = request.user
-
         if not producer.is_producer:
             return Response(
                 {"error": "Only producers can access this dashboard"},
@@ -650,55 +636,40 @@ class ProducerDashboardView(APIView):
     
 @login_required
 def producer_dashboard_page(request):
-
     if not request.user.is_producer:
         return redirect("/login/")
-
     return render(request, "dashboards/producerDash.html")
-
 
 @login_required
 def customer_dashboard_page(request):
-
     if request.user.is_producer:
         return redirect("/api/orders/dashboard/producer/view/")
-
     return render(request, "dashboards/customerDash.html")
 
 @login_required
 def add_product_page(request):
-
     if not request.user.is_producer:
         return redirect("/login/")
-
     return render(request, "dashboards/addProduct.html")
 
 @login_required
 def add_education_page(request):
-
     if not request.user.is_producer:
         return redirect("/login/")
-
     return render(request, "dashboards/addEducation.html")
 
 @login_required
 def edit_product_page(request, pk):
-
     if not request.user.is_producer:
         return redirect("/login/")
-
     product = get_object_or_404(Product, pk=pk, producer=request.user)
-
     return render(request, "dashboards/editProducts.html", {"product": product})
 
 @login_required
 def delete_product_page(request, pk):
-
     if not request.user.is_producer:
         return redirect("/login/")
-
     product = get_object_or_404(Product, pk=pk, producer=request.user)
-
     return render(request, "dashboards/deleteProducts.html", {"product": product})
 
 def edit_education_page(request, pk):
@@ -707,9 +678,7 @@ def edit_education_page(request, pk):
 
 def delete_education_page(request, pk):
     content = get_object_or_404(EducationalContent, pk=pk, producer=request.user)
-
     if request.method == "POST":
         content.delete()
         return redirect("/api/orders/dashboard/producer/view/")
-
     return render(request, "dashboards/deleteEducation.html", {"content": content})
