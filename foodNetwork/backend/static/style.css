@@ -1,0 +1,369 @@
+/* =========================
+    BASE
+========================= */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background-color: #8cdce3;
+    color: #2c3e50;
+    line-height: 1.6;
+}
+
+/* =========================
+   LAYOUT
+========================= */
+.container {
+    max-width: 1100px;
+    margin: auto;
+    padding: 20px;
+}
+
+.header {
+    background: #34807e;
+    color: white;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header a {
+    color: white;
+    text-decoration: none;
+    margin-left: 15px;
+    font-weight: 500;
+}
+
+.header a:hover {
+    text-decoration: underline;
+}
+
+/* =========================
+   WELCOME SECTION
+========================= */
+/* welcome section */
+.welcome {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+}
+
+.title {
+    font-size: 3rem;
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+.tagline {
+    font-size: 1.2rem;
+    max-width: 600px;
+    line-height: 1.6;
+    color: #ffffff;
+
+    background: #34807e;
+    padding: 20px;
+    border-radius: 12px;
+
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* Buttons section */
+.actions {
+    display: flex;
+    gap: 20px;
+}
+
+/* Button base */
+.btn {
+    text-decoration: none;
+    padding: 15px 35px;
+    font-size: 1rem;
+    border-radius: 8px;
+    transition: all 0.25s ease;
+    font-weight: 500;
+}
+
+/* Primary button */
+.btn-primary {
+    background: #34807e;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #286260;
+    transform: translateY(-2px);
+}
+
+/* Secondary button */
+.btn-secondary {
+    background: white;
+    color: #34807e;
+    border: 2px solid #34807e;
+}
+
+.btn-secondary:hover {
+    background: #286260;
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* =========================
+   TYPOGRAPHY
+========================= */
+h1 {
+    font-size: 28px;
+    margin-bottom: 20px;
+}
+
+h2 {
+    font-size: 22px;
+    margin: 20px 0 10px;
+}
+
+h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+h4 {
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+
+/* Layout container */
+.container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 20px;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+button {
+    background: #286260;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s ease;
+}
+
+button:hover {
+    background: #34807e;
+}
+
+button.secondary {
+    background: #607d8b;
+}
+
+button.secondary:hover {
+    background: #455a64;
+}
+
+button.danger {
+    background: #c62828b2;
+}
+
+button.danger:hover {
+    background: #c62828;
+}
+
+/* =========================
+   FORMS
+========================= */
+input, select, textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: #34807e;
+}
+
+/* =========================
+   CARDS BOXES
+========================= */
+.card {
+    background: #d9f4f3;
+    padding: 20px;
+    margin-bottom: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+/* =========================
+   PRODUCT LIST
+========================= */
+#products li {
+    list-style: none;
+    background: #f3ffff;
+    margin-bottom: 15px;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+#products strong {
+    font-size: 16px;
+}
+
+/* =========================
+   CART & ORDERS
+========================= */
+#cart li,
+#orders li {
+    list-style: none;
+    background: #f3ffff;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+}
+
+/* =========================
+   FILTER BAR
+========================= */
+.filters {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    text-align: left;
+}
+
+/* Section titles */
+.filters h3 {
+    font-size: 20px;
+    color: #607d8b;
+    margin-bottom: 5px;
+}
+
+.filters h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+/* Search box */
+#searchBox {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+
+    transition: all 0.2s ease;
+}
+
+#searchBox:focus {
+    border-color: #2c3e50;
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.15);
+}
+
+/* Grouped filter rows */
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Inline filters (category + producer side-by-side on desktop) */
+.filter-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.filter-row select {
+    flex: 1;
+    min-width: 140px;
+}
+
+/* Select styling */
+.filters select {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    background: #fff;
+    font-size: 14px;
+    cursor: pointer;
+
+    transition: all 0.2s ease;
+}
+
+.filters select:focus {
+    border-color: #2c3e50;
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.15);
+}
+
+/* Checkbox row */
+.filters label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+/* Make checkbox slightly nicer */
+.filters input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #607d8b;
+}
+
+/* Divider line between sections */
+.filters-divider {
+    height: 1px;
+    background: #eee;
+}
+
+/* Subtle card enhancement */
+.card .filters {
+    padding: 10px 5px;
+}
+
+/* =========================
+   ALERTS
+========================= */
+.alert {
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+}
+
+.alert.error {
+    background: #ffebee;
+    color: #c62828;
+}
+
+/* =========================
+   LINKS
+========================= */
+a {
+    color: #2c3e50;
+}
+
+a:hover {
+    text-decoration: underline;
+}

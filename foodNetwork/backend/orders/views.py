@@ -1,12 +1,13 @@
+from itertools import product
 from urllib import request
 from django.shortcuts import render
 from rest_framework import generics
 from .serializers import CartItemSerializer, OrderItemSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Cart, Order, OrderItem, CartItem
+from .models import Cart, Order, OrderItem, CartItem, Notification
 from users.models import User
-from .utils import calculate_distance
+from products.utils import calculate_distance, postcode_to_coords
 from rest_framework.exceptions import ValidationError
 from products.models import Product, EducationalContent
 from products.serializers import ProductSerializer
@@ -17,135 +18,600 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from datetime import datetime, timedelta
+from django.db import transaction
+from collections import defaultdict
+from .models import OrderItem
+import stripe
+from django.conf import settings
+from django.utils.timezone import make_aware, is_naive
+from decimal import Decimal
+import csv
+from django.http import HttpResponse
+
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 class CheckoutView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request):
-        user = request.user
-        cart = Cart.objects.get(user=user)
 
+        user = request.user
+
+        cart = Cart.objects.filter(user=user).first()
+        if not cart or not cart.items.exists():
+            raise ValidationError("Cart is empty")
+
+        delivery_method = request.data.get("delivery_method")
+        address = request.data.get("address")
         delivery_date = request.data.get("delivery_date")
+
+        if delivery_method == "delivery" and not address:
+            raise ValidationError("address required for delivery")
 
         if not delivery_date:
             raise ValidationError("Delivery date required")
 
-        delivery_date = datetime.fromisoformat(delivery_date)
+       
+        delivery_date = parse_datetime(delivery_date)
 
-        if delivery_date < timezone.now() + timedelta(hours=48):
-            raise ValidationError("Minimum 48-hour notice required")
+        if not delivery_date:
+            raise ValidationError("Invalid delivery date format")
+
+        if is_naive(delivery_date):
+            delivery_date = make_aware(delivery_date)
+
+        if delivery_date <= timezone.now() + timedelta(hours=48):
+            raise ValidationError("Orders must be placed at least 48 hours in advance")
 
         order = Order.objects.create(
             customer=user,
-            delivery_date=delivery_date
+            delivery_date=delivery_date,
+            status="pending",
+            payment_status="processing"
         )
+
+        created_items = []
 
         for item in cart.items.all():
             product = item.product
 
-            if not product.is_available():
-                raise ValidationError(f"{product.name} is not available")
+            if not product.is_active:
+                raise ValidationError(f"{product.name} has been recalled and cannot be ordered")
 
             if product.stock_quantity < item.quantity:
                 raise ValidationError(f"Not enough stock for {product.name}")
 
+            product = item.product
+            producer = product.producer
+
+            # Get postcodes
+            customer_postcode = user.postcode
+            producer_postcode = producer.postcode
+
+            lat1, lon1 = postcode_to_coords(customer_postcode)
+            lat2, lon2 = postcode_to_coords(producer_postcode)
+
+            if None not in (lat1, lon1, lat2, lon2):
+                food_miles = calculate_distance(lat1, lon1, lat2, lon2)
+            else:
+                food_miles = None
+
             product.stock_quantity -= item.quantity
             product.save()
 
-            OrderItem.objects.create(
+            order_item = OrderItem.objects.create(
                 order=order,
                 product=product,
+                product_name=product.name,
                 producer=product.producer,
+                producer_name=product.producer.username,
                 quantity=item.quantity,
-                price=product.discounted_price()
+                price=product.discounted_price,
+                delivery_method=delivery_method,
+                delivery_notes=address if delivery_method == "delivery" else "",
+                food_miles=food_miles
             )
+
+            created_items.append(order_item)
+
+            Notification.objects.create(
+                    user=product.producer,
+                    message=f"New order received: {product.name} x {item.quantity}",
+                    notification_type="order"
+                )
+
+        total_amount = sum(
+            item.price * item.quantity for item in created_items
+        )
+        intent = stripe.PaymentIntent.create(
+            amount=int(total_amount * 100),  # to pence
+            currency="gbp",
+            automatic_payment_methods={"enabled": True},
+            metadata={"order_id": order.id}
+        )
 
         cart.items.all().delete()
 
-        return Response({"message": "Order placed successfully"})
+        grouped = defaultdict(list)
 
-
-class CartItemCreateView(generics.CreateAPIView):
-
-    queryset = CartItem.objects.all()
-    serializer_class = CartItemSerializer
-
-
-class CartItemListView(generics.ListAPIView):
-
-    queryset = CartItem.objects.all()
-    serializer_class = CartItemSerializer
-
-class ProducerOrdersView(APIView):
-
-    def get(self, request):
-
-        producer = request.user
-
-        orders = OrderItem.objects.filter(
-            producer=producer
-        )
-
-        serializer = OrderItemSerializer(orders, many=True)
-
-        return Response(serializer.data)
-    
-class SustainabilityReportView(APIView):
-
-    permission_classes = [IsAdminUser]
-
-    def get(self, request):
-
-        order_items = OrderItem.objects.all()
-
-        total_food_miles = order_items.aggregate(
-            Sum("food_miles")
-        )["food_miles__sum"] or 0
-
-        avg_food_miles = order_items.aggregate(
-            Avg("food_miles")
-        )["food_miles__avg"] or 0
-
-        total_orders = Order.objects.count()
-
-        local_items = order_items.filter(food_miles__lte=50).count()
-        non_local_items = order_items.filter(food_miles__gt=50).count()
+        for item in created_items:
+            grouped[item.producer_name].append({
+                "product": item.product_name,
+                "quantity": item.quantity,
+                "subtotal": float(item.price * item.quantity),
+                "delivery": item.delivery_method,
+                "food_miles": item.food_miles
+            })
 
         return Response({
-            "total_orders": total_orders,
-            "total_food_miles": total_food_miles,
-            "average_food_miles": avg_food_miles,
-            "local_products": local_items,
-            "non_local_products": non_local_items
+            "client_secret": intent.client_secret,
+            "order_id": order.id,
+            "amount": float(total_amount)
         })
     
-class CustomerDashboardView(APIView):
-
-    authentication_classes = [SessionAuthentication, BasicAuthentication]
+class ProducerNotificationsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        notifications = Notification.objects.filter(
+            user=request.user,
+        ).order_by("-created_at")
 
+        return Response([
+            {
+                "id": n.id,
+                "message": n.message,
+                "created_at": n.created_at,
+                "is_read": n.is_read,
+                "notification_type": n.notification_type,
+                "severity": n.severity
+            } for n in notifications
+        ])
+    
+class CustomerNotificationsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        notifications = Notification.objects.filter(
+            user=request.user
+
+        ).order_by("-created_at")
+
+        return Response([
+            {
+                "id": n.id,
+                "message": n.message,
+                "created_at": n.created_at,
+                "is_read": n.is_read,
+                "notification_type": n.notification_type,
+                "severity": n.severity
+            }
+            for n in notifications
+        ])
+    
+class MarkNotificationReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        notification = get_object_or_404(
+            Notification,
+            pk=pk,
+            user=request.user
+        )
+
+        notification.is_read = True
+        notification.save()
+
+        return Response({"message": "Marked as read"})
+
+class SafetyAlertView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
         user = request.user
 
-        if user.is_producer:
-            return Response(
-                {"error": "Producers cannot access the customer dashboard"},
-                status=403
+        if not user.is_producer:
+            raise ValidationError("Only producers can send alerts")
+
+        product_id = request.data.get("product_id")
+        message = request.data.get("message")
+        severity = request.data.get("severity", "high")
+
+        if not product_id or not message:
+            raise ValidationError("Product and message required")
+
+        # GET PRODUCT (IMPORTANT)
+        product = get_object_or_404(Product, id=product_id, producer=user)
+
+        severity = request.data.get("severity", "low")
+
+        # AUTO RECALL FOR HIGH / CRITICAL
+        if severity in ["high", "critical"]:
+            product.status = "recalled"
+            product.save()
+        # PRODUCT RECALL (AUTO DISABLE)
+        product.is_active = False   # or is_available = False depending on your model
+        product.save()
+
+        # FIND AFFECTED CUSTOMERS
+        affected_orders = OrderItem.objects.filter(
+            product_id=product_id
+        ).select_related("order")
+
+        customers = set(item.order.customer for item in affected_orders)
+
+        # SEND ALERTS
+        for customer in customers:
+            Notification.objects.create(
+                user=customer,
+                message=f"⚠️ SAFETY ALERT ({severity.upper()}): {product.name} - {message}",
+                notification_type="alert",
+                severity=severity
             )
 
-        cart, created = Cart.objects.get_or_create(user=user)
+        return Response({
+            "message": "Alert sent & product recalled",
+            "product_disabled": True
+        })
 
+class ResolveProductView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        product = get_object_or_404(Product, pk=pk, producer=request.user)
+
+        product.is_active = True
+        product.is_recalled = False
+        product.status = "active"
+        product.save()
+
+        return Response({"message": "Product reactivated"})
+    
+class DisableProductView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        product = get_object_or_404(Product, pk=pk, producer=request.user)
+
+        product.is_active = False
+        product.is_recalled = True
+        product.status = "disabled"
+        product.save()
+
+        return Response({"message": "Product disabled"})
+
+class ConfirmPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        order = get_object_or_404(Order, id=order_id, customer=request.user)
+
+        order.payment_status = "paid"
+        order.paid_at = timezone.now()
+        order.save()
+
+        return Response({"message": "Payment confirmed"})
+
+class CartItemCreateView(generics.CreateAPIView):
+    serializer_class = CartItemSerializer
+    permission_classes = [IsAuthenticated]
+    def perform_create(self, serializer):
+        cart, _ = Cart.objects.get_or_create(user=self.request.user)
+        product = serializer.validated_data["product"]
+        quantity = serializer.validated_data.get("quantity", 1)
+
+        existing_item = CartItem.objects.filter(
+            cart=cart,
+            product=product
+        ).first()
+
+        if existing_item:
+            existing_item.quantity += quantity
+            existing_item.save()
+            self.instance = existing_item
+        else:
+            self.instance = serializer.save(cart=cart)
+
+        if product.is_recalled:
+            raise ValidationError("This product has been recalled")
+
+class CartItemListView(generics.ListAPIView):
+    serializer_class = CartItemSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return CartItem.objects.filter(cart__user=self.request.user)
+    
+class CartItemUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        item = get_object_or_404(CartItem, pk=pk, cart__user=request.user)
+        change = int(request.data.get("change", 0))
+
+        new_quantity = item.quantity + change
+
+        # STOCK VALIDATION
+        if new_quantity > item.product.stock_quantity:
+            raise ValidationError("Not enough stock available")
+
+        item.quantity = new_quantity
+
+        if item.quantity <= 0:
+            item.delete()
+            return Response({"message": "Item removed"})
+
+        item.save()
+        return Response({"quantity": item.quantity})
+
+    def delete(self, request, pk):
+        item = get_object_or_404(CartItem, pk=pk, cart__user=request.user)
+        item.delete()
+        return Response({"message": "Deleted"})
+
+class UpdateOrderItemView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        item = get_object_or_404(OrderItem, pk=pk, producer=request.user)
+
+        VALID_TRANSITIONS = {
+            "pending": ["shipped", "ready"],
+            "shipped": ["completed"],
+            "ready": ["completed"],
+            "completed": []
+        }
+
+        new_status = request.data.get("status")
+
+        if new_status:
+            if new_status not in VALID_TRANSITIONS[item.status]:
+                raise ValidationError("Invalid status transition")
+
+            item.status = new_status
+
+            # CREATE CUSTOMER NOTIFICATION
+            message = None
+
+            if new_status == "ready":
+                message = f"Order #{item.order.id}: {item.product_name} is ready for pickup"
+
+            elif new_status == "shipped":
+                message = f"Order #{item.order.id}: {item.product_name} has been shipped"
+
+            elif new_status == "completed":
+                message = f"Order #{item.order.id}: {item.product_name} order completed"
+
+            if message:
+                Notification.objects.create(
+                    user=item.order.customer,
+                    message=message
+                )
+
+        delivery_time = request.data.get("delivery_time")
+        if delivery_time:
+            item.delivery_time = delivery_time
+            Notification.objects.create(
+                user=item.order.customer,
+                message=f"Order #{item.order.id}: Delivery scheduled for {delivery_time}"
+            )
+
+        item.save()
+
+        return Response({"message": "Updated"})
+
+class ProducerOrdersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        producer = request.user
+        items = OrderItem.objects.filter(producer=producer).select_related("order")
+
+        grouped = {}
+        total_sales = 0
+
+        for item in items:
+            order_id = item.order.id
+
+            if order_id not in grouped:
+                grouped[order_id] = {
+                    "date": item.order.created_at,
+                    "items": [],
+                    "total": 0
+                }
+
+            subtotal = float(item.price * item.quantity)
+
+            grouped[order_id]["items"].append({
+                "id": item.id,
+                "product": item.product_name,
+                "quantity": item.quantity,
+                "status": item.status,
+                "delivery_time": item.delivery_time.isoformat() if item.delivery_time else None,
+                "delivery_method": item.delivery_method,
+                "delivery_notes": item.delivery_notes,
+                "subtotal": subtotal
+            })
+
+            grouped[order_id]["total"] += subtotal
+            if item.order.payment_status == "paid":
+                total_sales += subtotal
+
+        return Response({
+            "orders": grouped,
+            "total_sales": total_sales,
+            "network_fee": total_sales * 0.05,
+            "net_earnings": total_sales * 0.95
+        })
+
+class WeeklySettlementView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+
+        if not user.is_producer:
+            return Response({"error": "Only producers allowed"}, status=403)
+
+        with transaction.atomic():
+            items = OrderItem.objects.select_for_update().filter(
+                producer=user,
+                order__payment_status="paid",
+                is_settled=False
+            )
+
+            if not items.exists():
+                return Response({
+                    "status": "No settlements available",
+                    "period": "Unsettled Paid Orders",
+                    "gross_sales": 0,
+                    "platform_fee": 0,
+                    "net_earnings": 0,
+                    "tax_year_total": float(sum(
+                        i.price * i.quantity
+                        for i in OrderItem.objects.filter(
+                            producer=user,
+                            order__payment_status="paid"
+                        )
+                    )),
+                    "items_count": 0,
+                    "breakdown": []
+                })
+
+            total = sum(item.price * item.quantity for item in items)
+            fee = total * Decimal("0.05")
+            net = total - fee
+
+            breakdown = [
+                {
+                    "order_id": item.order.id,
+                    "product": item.product_name,
+                    "quantity": item.quantity,
+                    "subtotal": float(item.price * item.quantity),
+                }
+                for item in items
+            ]
+
+            # mark as settled
+            now = timezone.now()
+            for item in items:
+                item.is_settled = True
+                item.settled_at = now
+
+            OrderItem.objects.bulk_update(items, ["is_settled", "settled_at"])
+
+            tax_year_total = sum(
+                i.price * i.quantity
+                for i in OrderItem.objects.filter(
+                    producer=user,
+                    order__payment_status="paid"
+                )
+            )
+
+            return Response({
+                "status": "Processed",
+                "period": "Unsettled Paid Orders",
+                "gross_sales": float(total),
+                "platform_fee": float(fee),
+                "net_earnings": float(net),
+                "tax_year_total": float(tax_year_total),
+                "items_count": len(items),
+                "breakdown": breakdown
+            })
+
+class EnvironmentalReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, order_id):
+        user = request.user
+
+        try:
+            order = Order.objects.get(id=order_id, customer=user)
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=404)
+
+        items = OrderItem.objects.filter(order=order)
+
+        report = []
+        total_miles = 0
+
+        for item in items:
+            product = item.product
+            producer = product.producer
+
+            if (
+                producer.latitude is not None and
+                producer.longitude is not None and
+                user.latitude is not None and
+                user.longitude is not None
+            ):
+                miles = calculate_distance(
+                    producer.latitude,
+                    producer.longitude,
+                    user.latitude,
+                    user.longitude
+                )
+            else:
+                miles = 0
+
+            total_miles += miles
+
+            report.append({
+                "product": product.name,
+                "quantity": item.quantity,
+                "food_miles": round(miles, 2),
+                "subtotal": float(item.subtotal())
+            })
+
+        # CO2 calculation
+        CO2_PER_MILE = 0.411
+        total_co2 = total_miles * CO2_PER_MILE
+
+        # --- CSV RESPONSE ---
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="report_order_{order.id}.csv"'
+
+        writer = csv.writer(response)
+
+        writer.writerow(["Product", "Quantity", "Food Miles", "Subtotal (£)"])
+
+        for item in report:
+            writer.writerow([
+                item["product"],
+                item["quantity"],
+                item["food_miles"],
+                item["subtotal"]
+            ])
+
+        writer.writerow([])
+        writer.writerow(["TOTAL MILES", round(total_miles, 2)])
+        writer.writerow(["TOTAL CO2 (kg)", round(total_co2, 2)])
+
+        return response
+    
+class CustomerDashboardView(APIView):
+
+    def get(self, request):
+        user = request.user
+
+        cart, _ = Cart.objects.get_or_create(user=user)
         cart_items = cart.items.all()
         orders = OrderItem.objects.filter(order__customer=user)
 
-        cart_data = CartItemSerializer(cart_items, many=True).data
-        order_data = OrderItemSerializer(orders, many=True).data
+        cart_total = sum(
+            item.product.discounted_price * item.quantity
+            for item in cart_items
+        )
 
         return Response({
-            "cart_items": cart_data,
-            "orders": order_data
+            "cart_items": CartItemSerializer(cart_items, many=True).data,
+            "cart_total": cart_total,
+            "orders": OrderItemSerializer(orders, many=True).data
         })
 
 

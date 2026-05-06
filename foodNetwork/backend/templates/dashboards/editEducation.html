@@ -1,26 +1,31 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
+<head>
+    <title>Edit Educational Content</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
 <body>
 <input type="hidden" id="csrfToken" value="{{ csrf_token }}">
 
-<h2>Edit Educational Content</h2>
+<h2 class="header">Edit Educational Content</h2>
 
-<form id="form">
+<div class="card">
+    <form id="form">
+        <h3>Options:</h3><br>
+        <select id="content_type">
+        <option value="recipe">Recipe</option>
+        <option value="storage">Storage Guidance</option>
+        <option value="story">Farm Story</option>
+        </select><br>
+        <h3>Title:</h3><input id="title" placeholder="Title"><br>
+        <h3>Content:</h3><textarea id="content" placeholder="Content"></textarea><br>
+        <button>Save</button>
+    </form>
+</div>
 
-<select id="content_type">
-<option value="recipe">Recipe</option>
-<option value="storage">Storage Guidance</option>
-<option value="story">Farm Story</option>
-</select><br>
-
-<input id="title" placeholder="Title"><br>
-
-<textarea id="content" placeholder="Content"></textarea><br>
-
-<button>Save</button>
-
-</form>
-
+{% comment %} ##### SCRIPT ##### {% endcomment %}
 <script>
 const id = window.location.pathname.split("/").filter(Boolean).pop();
 const csrfToken = document.getElementById("csrfToken").value;

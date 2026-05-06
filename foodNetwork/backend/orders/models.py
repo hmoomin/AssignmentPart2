@@ -1,31 +1,30 @@
 from django.db import models
 from django.conf import settings
-from products.models import Product
-from django.utils import timezone
-from datetime import timedelta
 from django.utils import timezone
 
 User = settings.AUTH_USER_MODEL
 
 class Cart(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-
     def __str__(self):
         return f"{self.user}'s cart"
 
 
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name="items")
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product = models.ForeignKey("products.Product", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
 
     def subtotal(self):
-        return self.product.price * self.quantity
-
+        return self.product.discounted_price * self.quantity
+    
 class Order(models.Model):
     customer = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
-    delivery_date = models.DateTimeField(default=timezone.now())
+    delivery_date = models.DateTimeField()
+    paid_at = models.DateTimeField(null=True, blank=True)
+    # Payment
+    payment_status = models.CharField(max_length=20, default="processing")
 
     STATUS_PENDING = "pending"
     STATUS_PAID = "paid"
@@ -44,60 +43,109 @@ class Order(models.Model):
     )
 
     def total_price(self):
-        return sum(item.price * item.quantity for item in self.items.all())
+        return sum(item.subtotal() for item in self.items.all())
+
+    def __str__(self):
+        return f"Order {self.id} - {self.customer}"
 
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+
+    # Reference (optional for integrity)
+    product = models.ForeignKey("products.Product", on_delete=models.SET_NULL, null=True)
+
+    # SNAPSHOT FIELDS (critical)
+    product_name = models.CharField(max_length=200, default="Unknown Product")
     producer = models.ForeignKey(User, on_delete=models.CASCADE)
+    producer_name = models.CharField(max_length=200, default="Unknown Producer")
+
     quantity = models.PositiveIntegerField()
-    price = models.DecimalField(max_digits=8, decimal_places=2)
+
+    # Pricing snapshot
+    price = models.DecimalField(max_digits=8, decimal_places=3)
+
+    # Delivery snapshot
+    delivery_method = models.CharField(max_length=20, default="pickup")
+    delivery_notes = models.TextField(blank=True)
+
+    # Accounting etc
+    is_settled = models.BooleanField(default=False)
+    settled_at = models.DateTimeField(null=True, blank=True)
+
+    # Sustainability
     food_miles = models.FloatField(null=True, blank=True)
+
+    STATUS_PENDING = "pending"
+    STATUS_SHIPPED = "shipped"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_SHIPPED, "Shipped"),
+    ]
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING
+    )
+
+    delivery_time = models.DateTimeField(null=True, blank=True)
+
+    def subtotal(self):
+        return self.price * self.quantity
+
+    def __str__(self):
+        return f"{self.product_name} x {self.quantity}"
 
 
 class Payment(models.Model):
     producer = models.ForeignKey(User, on_delete=models.CASCADE)
     orders = models.ManyToManyField(OrderItem)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    amount = models.DecimalField(max_digits=10, decimal_places=3)
+
     created_at = models.DateTimeField(auto_now_add=True)
     is_paid = models.BooleanField(default=False)
 
-class Message(models.Model):
-    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_messages")
-    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_messages")
-    content = models.TextField()
-    is_urgent = models.BooleanField(default=False)
+    def __str__(self):
+        return f"Payment to {self.producer} - {self.amount}"
+    
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    message = models.TextField()
+
+    notification_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("normal", "Normal"),
+            ("order", "Order Update"),
+            ("alert", "Safety Alert"),
+            ("discount", "Discount"),
+        ],
+        default="normal"
+    )
+
+    severity = models.CharField(
+        max_length=10,
+        choices=[
+            ("low", "Low"),
+            ("medium", "Medium"),
+            ("high", "High"),
+            ("critical", "Critical"),
+        ],
+        default="low"
+    )
+
+    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+class Settlement(models.Model):
+    producer = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
 
-def send_urgent_alert(producer, content):
-    customers = User.objects.filter(role="customer")
+    gross_sales = models.DecimalField(max_digits=10, decimal_places=2)
+    platform_fee = models.DecimalField(max_digits=10, decimal_places=2)
+    net_earnings = models.DecimalField(max_digits=10, decimal_places=2)
 
-    for customer in customers:
-        Message.objects.create(
-            sender=producer,
-            receiver=customer,
-            content=content,
-            is_urgent=True
-        )
-
-def generate_weekly_payments():
-    last_week = timezone.now() - timedelta(days=7)
-
-    producers = User.objects.filter(role="producer")
-
-    for producer in producers:
-        orders = OrderItem.objects.filter(
-            producer=producer,
-            order__created_at__gte=last_week
-        )
-
-        total = sum(o.price * o.quantity for o in orders)
-
-        if total > 0:
-            payment = Payment.objects.create(
-                producer=producer,
-                amount=total
-            )
-            payment.orders.set(orders)
+    items = models.ManyToManyField(OrderItem)

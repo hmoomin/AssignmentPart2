@@ -1,40 +1,40 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
 <head>
-<title>Add Educational Content</title>
+    <title>Add Educational Content</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
 </head>
 <input type="hidden" id="csrfToken" value="{{ csrf_token }}">
 <body>
+    <h2 class="header">Add Educational Content</h2>
+    <div class="card">
+    <label>Content Type:</label><br>
+        <form id="eduForm">
+        <select name="content_type">
+            <option value="recipe">Recipe</option>
+            <option value="storage">Storage Guidance</option>
+            <option value="story">Farm Story</option>
+        </select><br>
+        <label>Title:</label><br>
+        <input type="text" name="title" placeholder="Title"><br>
+        <label>Content:</label><br>
+        <textarea name="content" placeholder="Content"></textarea><br>
 
-<h2>Add Educational Content</h2>
-
-<form id="eduForm">
-
-<select name="content_type">
-    <option value="recipe">Recipe</option>
-    <option value="storage">Storage Guidance</option>
-    <option value="story">Farm Story</option>
-</select><br>
-
-<input type="text" name="title" placeholder="Title"><br>
-<textarea name="content" placeholder="Content"></textarea><br>
-
-<button type="submit">Add Content</button>
-
-</form>
-
+        <button type="submit">Add Content</button>
+        </form>
+    </div>
+{% comment %} ##### SCRIPT ##### {% endcomment %}
 <script>
 document.getElementById("eduForm").addEventListener("submit", function(e) {
     e.preventDefault();
-
     const data = {
         content_type: this.content_type.value,
         title: this.title.value,
         content: this.content.value
     };
-
     const csrfToken = document.getElementById("csrfToken").value;
-
     fetch("/api/products/education/", {
         method: "POST",
         headers: {
@@ -45,15 +45,20 @@ document.getElementById("eduForm").addEventListener("submit", function(e) {
         body: JSON.stringify(data)
     })
     .then(async res => {
-        const responseData = await res.json();
-
-        if (!res.ok) {
-            console.error("BACKEND ERROR:", responseData);
-            alert(JSON.stringify(responseData));
-            throw new Error("Failed");
+        const text = await res.text();
+        try {
+            const responseData = JSON.parse(text);
+            if (!res.ok) {
+                console.error("BACKEND ERROR:", responseData);
+                alert(JSON.stringify(responseData));
+                throw new Error("Failed");
+            }
+            return responseData;
+        } catch {
+            console.error("RAW RESPONSE:", text);
+            alert("Server error - check console");
+            throw new Error("Invalid JSON");
         }
-
-        return responseData;
     })
     .then(() => {
         alert("Content added!");

@@ -1,42 +1,43 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
-<head><title>Edit Product</title></head>
+<head>
+    <title>Edit Product</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
 
 <body>
 
 <input type="hidden" id="csrfToken" value="{{ csrf_token }}">
 
-<h2>Edit Product</h2>
+<h2 class="header">Edit Product</h2>
+<div class="card">
+    <form id="form">
+        <h3>Name: </h3><input id="name"><br>
+        <h3>Description: </h3><textarea id="description"></textarea><br>
+        <h3>Price: </h3><input type="number" step="0.01" id="price"><br>
+        <h3>Categories:</h3><br>
+        <select id="category">
+        <option value="vegetables">Vegetables</option>
+        <option value="dairy">Dairy</option>
+        <option value="bakery">Bakery</option>
+        <option value="preserves">Preserves</option>
+        <option value="seasonal">Seasonal</option>
+        </select><br>
+        <h3>Organic Certified?</h3>
+        <input type="checkbox" id="is_organic"><br>
+        <h3>Allergens: </h3><textarea id="allergen_info"></textarea><br>
+        <h3>Harvest Date: </h3><input type="date" id="harvest_date"><br>
+        <h3>Best Before Date: </h3><input type="date" id="best_before_date"><br>
+        <h3>Available From: </h3><input type="date" id="available_from"><br>
+        <h3>Available To: </h3><input type="date" id="available_to"><br>
+        <h3>Stock Quantity: </h3><input type="number" id="stock_quantity"><br>
+        <button>Save</button>
+    </form>
+</div>
 
-<form id="form">
-
-<input id="name"><br>
-<textarea id="description"></textarea><br>
-<input type="number" step="0.01" id="price"><br>
-
-<select id="category">
-<option value="vegetables">Vegetables</option>
-<option value="dairy">Dairy</option>
-<option value="bakery">Bakery</option>
-<option value="preserves">Preserves</option>
-<option value="seasonal">Seasonal</option>
-</select><br>
-
-<label>Organic</label>
-<input type="checkbox" id="is_organic"><br>
-
-<textarea id="allergen_info"></textarea><br>
-
-<input type="date" id="best_before_date"><br>
-<input type="date" id="available_from"><br>
-<input type="date" id="available_to"><br>
-
-<input type="number" id="stock_quantity"><br>
-
-<button>Save</button>
-
-</form>
-
+{% comment %} ##### SCRIPT ##### {% endcomment %}
 <script>
 const id = window.location.pathname.split("/").filter(Boolean).pop();
 const csrfToken = document.getElementById("csrfToken").value;
@@ -50,13 +51,13 @@ const categoryInput = document.getElementById("category");
 const organicInput = document.getElementById("is_organic");
 const allergenInput = document.getElementById("allergen_info");
 const bestBeforeInput = document.getElementById("best_before_date");
+const harvestInput = document.getElementById("harvest_date");
 const fromInput = document.getElementById("available_from");
 const toInput = document.getElementById("available_to");
 const stockInput = document.getElementById("stock_quantity");
 
 // Date Restrictions
 const today = new Date().toISOString().split("T")[0];
-
 bestBeforeInput.min = today;
 fromInput.min = today;
 toInput.min = today;
@@ -72,7 +73,7 @@ fetch(`/api/products/${id}/`, { credentials: "include" })
     organicInput.checked = p.is_organic;
     allergenInput.value = p.allergen_info;
     bestBeforeInput.value = p.best_before_date;
-    fromInput.value = p.available_from;
+    harvestInput.value = p.harvest_date;
     toInput.value = p.available_to;
     stockInput.value = p.stock_quantity;
 });
@@ -80,7 +81,6 @@ fetch(`/api/products/${id}/`, { credentials: "include" })
 // SAVE
 form.onsubmit = e => {
     e.preventDefault();
-
     fetch(`/api/products/${id}/`, {
         method: "PUT",
         headers: {
@@ -96,6 +96,7 @@ form.onsubmit = e => {
             is_organic: organicInput.checked,
             allergen_info: allergenInput.value,
             best_before_date: bestBeforeInput.value,
+            harvest_date: harvestInput.value,
             available_from: fromInput.value,
             available_to: toInput.value,
             stock_quantity: stockInput.value
@@ -107,6 +108,5 @@ form.onsubmit = e => {
     });
 };
 </script>
-
 </body>
 </html>

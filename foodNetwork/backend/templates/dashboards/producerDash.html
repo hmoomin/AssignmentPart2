@@ -1,10 +1,13 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
 <head>
     <title>Producer Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
 </head>
 <body>
-<div style="background:#2e7d32;color:white;padding:15px;">
+<div style="background:#2c3e50;color:white;padding:15px;">
 <span> Welcome {{ request.user.username }}</span>
 <a href="/change-password/" style="margin-left:20px;color:white;">
 Change Password
@@ -12,53 +15,55 @@ Change Password
 <a href="/logout/" style="float:right;color:white;">Logout</a>
 </div>
 
-<h1>Producer Dashboard</h1>
+<h1 class="header">Producer Dashboard</h1>
 
-<h2>Actions</h2>
+<div class="card">
+    <h2>Notifications</h2>
+    <ul id="notifications"></ul>
+</div>
 
-<a href="/producer/add-product/">
-    <button>Add Product</button>
-</a>
+<div class="card">
+    <h2>Actions</h2>
+    <a href="/producer/add-product/">
+        <button class="secondary">Add Product</button>
+    </a>
+    <a href="/producer/add-education/">
+        <button class="secondary">Add Educational Content</button>
+    </a>
+</div>
 
-<a href="/producer/add-education/">
-    <button>Add Educational Content</button>
-</a>
-
-<h2>Educational Content</h2>
-<ul id="education"></ul>
+<div class="card">
+    <h2>Educational Content</h2>
+    <ul id="education"></ul>
+</div>
 
 <div id="eduFormContainer" style="display:none;">
     <h3>Edit Educational Content</h3>
-
     <form id="eduForm">
         <input type="hidden" id="eduId">
-
         <select id="content_type">
             <option value="recipe">Recipe</option>
             <option value="storage">Storage</option>
             <option value="story">Story</option>
         </select><br>
-
         <input type="text" id="eduTitle"><br>
         <textarea id="eduContent"></textarea><br>
-
         <button type="submit">Save</button>
     </form>
 </div>
 
-<h2>Your Products</h2>
-<ul id="products"></ul>
+<div class="card">
+    <h2>Your Products</h2>
+    <ul id="products"></ul>
+</div>
 
 <div id="editFormContainer" style="display:none;">
     <h3>Edit Product</h3>
-
     <form id="editForm">
         <input type="hidden" id="productId">
-
         <input type="text" id="name" placeholder="Name"><br>
         <textarea id="description" placeholder="Description"></textarea><br>
         <input type="number" step="0.01" id="price" placeholder="Price"><br>
-
         <select id="category">
             <option value="vegetables">Vegetables</option>
             <option value="dairy">Dairy</option>
@@ -66,85 +71,473 @@ Change Password
             <option value="preserves">Preserves</option>
             <option value="seasonal">Seasonal</option>
         </select><br>
-
         <label>Organic:</label>
         <input type="checkbox" id="is_organic"><br>
-
         <textarea id="allergen_info" placeholder="Allergen Info"></textarea><br>
-
         <label>Best Before:</label>
         <input type="date" id="best_before_date"><br>
-
         <label>Available From:</label>
         <input type="date" id="available_from"><br>
-
         <label>Available To:</label>
         <input type="date" id="available_to"><br>
-
         <label>Stock:</label>
         <input type="number" id="stock_quantity"><br>
-
         <button type="submit">Save Changes</button>
     </form>
 </div>
 
-<h2>Orders</h2>
-<ul id="orders"></ul>
+<div class="card">
+    <h2>🚨 Report Safety Issue</h2>
+    <label>Product:</label>
+    <select id="alertProduct"></select>
+    <select id="alertSeverity">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+        <option value="critical">Critical</option>
+    </select>
+    <br><br>
+    <label>Issue:</label><br>
+    <textarea id="alertMessage" placeholder="Describe the issue..." rows="4" cols="40"></textarea>
+    <br><br>
+    <button onclick="sendAlert()">Send Alert</button>
+</div>
 
-<h2>Total Sales</h2>
-<p id="sales"></p>
+<div class="card">
+    <h2>Incoming Orders</h2>
+    <ul id="producerOrders"></ul>
+</div>
 
+<div class="card">
+    <h2>Total Sales</h2>
+    <p id="sales"></p>
+</div>
+
+<div class="card">
+    <h2>Payments & Reports</h2>
+    <button class="secondary" onclick="runSettlement()">Generate Weekly Settlement</button>
+    <button class="secondary" onclick="downloadSettlement()">Download Report</button>
+
+    <div id="settlementStatus"></div>
+    <table border="1" id="settlementTable">
+        <thead>
+            <tr>
+                <th>Order</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Subtotal (£)</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <h3 id="settlementSummary"></h3>
+</div>
+
+{% comment %} ##### SCRIPTS ##### {% endcomment %}
 <script>
 // ================= PRODUCTS =================
 fetch("/api/products/", { credentials: "include" })
 .then(res => res.json())
 .then(data => {
-
     const list = document.getElementById("products");
     list.innerHTML = "";
-
     data.forEach(product => {
         const li = document.createElement("li");
-
         li.innerHTML = `
-            ${product.name} - £${product.price}
+            <strong>${product.name}</strong> - £${product.price}
+            <br>Status: <strong>${product.status}</strong>
+            ${
+                product.status === "recalled"
+                ? `<br><button class="secondary" onclick="resolveProduct(${product.id})">
+                        ✅ Resolve Issue (Make Active)
+                </button>`
+                : ""
+            }
+            ${
+                product.status === "active"
+                ? `<br><button class="danger" onclick="disableProduct(${product.id})">
+                        ⛔ Disable Product
+                </button>`
+                : ""
+            }
+            ${
+                product.status === "disabled"
+                ? `<br><button class="secondary" onclick="resolveProduct(${product.id})">
+                        🔄 Re-enable Product
+                </button>`
+                : ""
+            }
+            <br>
             <a href="/producer/edit-product/${product.id}/">
-                <button>Edit</button>
+                <button class="secondary">Edit</button>
             </a>
             <a href="/producer/delete-product/${product.id}/">
-                <button>Delete</button>
+                <button class="danger">Delete</button>
             </a>
         `;
-
         list.appendChild(li);
     });
 });
 
+function loadProducerProductsForAlert() {
+    fetch("/api/products/", { credentials: "include" })
+    .then(res => res.json())
+    .then(data => {
+        const dropdown = document.getElementById("alertProduct");
+        dropdown.innerHTML = "";
+        data.forEach(p => {
+            const option = document.createElement("option");
+            option.value = p.id;
+            option.textContent = p.name;
+            dropdown.appendChild(option);
+        });
+    });
+}
+
+function loadProducerOrders() {
+    fetch("/api/orders/dashboard/producer/", { credentials: "include" })
+    .then(res => res.json())
+    .then(data => {
+        const list = document.getElementById("producerOrders");
+        list.innerHTML = "";
+        const orders = data.orders || {};
+        Object.keys(orders).forEach(orderId => {
+            const order = orders[orderId];
+            let li = document.createElement("li");
+            li.innerHTML = `
+                <strong>Order #${orderId}</strong><br>
+                Date: ${order.date ? new Date(order.date).toLocaleString() : "N/A"}<br>
+                <ul>
+                    ${(order.items || []).map(i => `
+                        <li>
+                            ${i.product} x ${i.quantity}
+                            (£${(i.subtotal || 0).toFixed(2)})
+                            <br>Status: ${i.status || "pending"}
+                            ${i.delivery_time 
+                                ? `<br>Delivery: ${new Date(i.delivery_time).toLocaleString()}`
+                                : ""}
+
+                            <br>Method: ${i.delivery_method || "pickup"}
+                            ${i.delivery_notes 
+                                ? `<br>address: ${i.delivery_notes}` 
+                                : ""}
+
+                            <br>
+                            ${i.delivery_method === "delivery"
+                                ? `<button onclick="updateStatus(${i.id}, 'shipped')">Ship</button>`
+                                : `<button onclick="updateStatus(${i.id}, 'ready')">Ready</button>`
+                            }
+                            <button onclick="updateStatus(${i.id}, 'completed')">Complete</button>
+                            ${i.delivery_method === "delivery" ? `
+                                <br>
+                                <input type="datetime-local" id="time-${i.id}">
+                                <button onclick="setDelivery(${i.id})">Set Delivery Time</button>
+                            ` : ""}
+                        </li>
+                    `).join("")}
+                </ul>
+                <strong>Total: £${(order.total || 0).toFixed(2)}</strong>
+                <hr>
+            `;
+            list.appendChild(li);
+        });
+        // APPLY MIN DATE AFTER RENDER
+        document.querySelectorAll('input[type="datetime-local"]').forEach(input => {
+            input.min = getMinDateTime();
+        });
+        // SALES SAFE RENDER
+        const total = data.total_sales || 0;
+        document.getElementById("sales").innerHTML = `
+            Total Sales: £${total.toFixed(2)}<br>
+            Network Fee (5%): £${(total * 0.05).toFixed(2)}<br>
+            You Earn: £${(total * 0.95).toFixed(2)}
+        `;
+    });
+}
+
+function resolveProduct(id) {
+    fetch(`/api/orders/product/${id}/resolve/`, {
+        method: "PATCH",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    }).then(() => {
+        alert("Product is back on sale");
+        location.reload();
+    });
+}
+
+function disableProduct(id) {
+    fetch(`/api/orders/product/${id}/disable/`, {
+        method: "PATCH",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    }).then(() => {
+        alert("Product disabled");
+        location.reload();
+    });
+}
+
+function getMinDateTime() {
+    let now = new Date();
+    // Fix timezone offset for datetime-local
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    // Enforce 48-hour lead time
+    now.setHours(now.getHours() + 48);
+    return now.toISOString().slice(0, 16);
+}
+
+function updateStatus(itemId, status) {
+    fetch(`/api/orders/item/${itemId}/`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify({ status: status })
+    }).then(() => loadProducerOrders());
+}
+
+function setDelivery(itemId) {
+    const value = document.getElementById(`time-${itemId}`).value;
+    fetch(`/api/orders/item/${itemId}/`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify({ delivery_time: value })
+    })
+    .then(() => {
+        alert("Delivery time set successfully!");
+        loadProducerOrders();
+    });
+}
+
+function markReady(itemId) {
+    fetch(`/api/orders/item/${itemId}/`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify({ status: "ready" })
+    })
+    .then(() => {
+        alert("Customer notified: Ready for pickup");
+        loadProducerOrders();
+    });
+}
+
+function loadNotifications() {
+    fetch("/api/orders/notifications/", { credentials: "include" })
+    .then(res => res.json())
+    .then(data => {
+        const list = document.getElementById("notifications");
+        list.innerHTML = "";
+        data
+        .filter(n => !n.is_read) // ONLY SHOW UNREAD
+        .forEach(n => {
+            const li = document.createElement("li");
+            li.innerHTML = `
+                ${n.message}
+                <br><small>${new Date(n.created_at).toLocaleString()}</small>
+                <br>
+                <button onclick="markOneRead(${n.id})">Mark as read</button>
+            `;
+            list.appendChild(li);
+        });
+    });
+}
+
+function sendAlert() {
+    const productSelect = document.getElementById("alertProduct");
+    const productId = productSelect.value;
+    const productName = productSelect.selectedOptions[0]?.text;
+    const message = document.getElementById("alertMessage").value;
+    const severity = document.getElementById("alertSeverity").value;
+    // Prevent empty product
+    if (!productId) {
+        alert("Select a product");
+        return;
+    }
+    // Prevent empty message
+    if (!message) {
+        alert("Please describe the issue");
+        return;
+    }
+    // Confirmation (with product name)
+    if (!confirm(`Send ${severity.toUpperCase()} alert for "${productName}"?`)) {
+        return;
+    }
+    fetch("/api/orders/safety-alert/", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify({
+            product_id: productId,
+            message: message,
+            severity: severity
+        })
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(err => { throw err; });
+        }
+        return res.json();
+    })
+    .then(data => {
+        alert("Alert sent successfully");
+        // Auto-clear form
+        document.getElementById("alertMessage").value = "";
+        document.getElementById("alertSeverity").value = "low";
+    })
+    .catch(err => {
+        console.error(err);
+        alert(err.detail || "Failed to send alert");
+    });
+}
+
+function markOneRead(notificationId) {
+    fetch(`/api/orders/notifications/${notificationId}/read/`, {
+        method: "PATCH",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    })
+    .then(() => {
+        loadNotifications(); // refresh list
+    });
+}
+
+function markNotificationsRead() {
+    fetch("/api/orders/notifications/read/", {
+        method: "PATCH",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    });
+} 
+
+function runSettlement() {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerText = "Processing...";
+    fetch("/api/orders/settlements/weekly/", {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        window.latestSettlement = data;
+        document.getElementById("settlementStatus").innerHTML = `
+            <strong>Status:</strong> ${data.status}<br>
+        `;
+        const tbody = document.querySelector("#settlementTable tbody");
+        tbody.innerHTML = "";
+        data.breakdown.forEach(item => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>#${item.order_id}</td>
+                <td>${item.product}</td>
+                <td>${item.quantity}</td>
+                <td>£${item.subtotal.toFixed(2)}</td>
+            `;
+            tbody.appendChild(row);
+        });
+        document.getElementById("settlementSummary").innerHTML = `
+            <strong>Period:</strong> ${data.period}<br>
+            Gross Sales: £${data.gross_sales.toFixed(2)}<br>
+            Platform Fee (5%): £${data.platform_fee.toFixed(2)}<br>
+            Net Earnings: £${data.net_earnings.toFixed(2)}<br>
+            Tax Year Total: £${data.tax_year_total.toFixed(2)}<br>
+            Orders Settled: ${data.items_count}
+        `;
+        if (data.items_count === 0) {
+            btn.innerText = "No settlements available";
+            btn.disabled = true;
+        } else {
+            btn.innerText = "Settlement Complete";
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerText = "Generate Weekly Settlement";
+    });
+}
+
+function downloadSettlement() {
+    if (!window.latestSettlement) {
+        alert("Run settlement first");
+        return;
+    }
+    const data = window.latestSettlement;
+    let csv = "";
+    // SUMMARY
+    csv += "Settlement Summary\n";
+    csv += `Period,${data.period}\n`;
+    csv += `Status,${data.status}\n`;
+    csv += `Gross Sales,${data.gross_sales}\n`;
+    csv += `Platform Fee,${data.platform_fee}\n`;
+    csv += `Net Earnings,${data.net_earnings}\n`;
+    csv += `Tax Year Total,${data.tax_year_total}\n`;
+    csv += `Items Count,${data.items_count}\n\n`;
+    // BREAKDOWN
+    csv += "Order Breakdown\n";
+    csv += "Order ID,Product,Quantity,Subtotal\n";
+    data.breakdown.forEach(item => {
+        csv += `${item.order_id},${item.product},${item.quantity},${item.subtotal}\n`;
+    });
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "settlement_report.csv";
+    a.click();
+}
+
+function getCSRFToken() {
+    return document.cookie
+        .split("; ")
+        .find(row => row.startsWith("csrftoken"))
+        ?.split("=")[1];
+}
+
+// LOAD ON PAGE
+document.addEventListener("DOMContentLoaded", () => {
+    loadProducerOrders();
+    loadNotifications();
+    loadProducerProductsForAlert();
+});
 
 // ================= EDUCATIONAL CONTENT =================
 fetch("/api/products/education/", { credentials: "include" })
 .then(res => res.json())
 .then(data => {
-
     const list = document.getElementById("education");
     list.innerHTML = "";
-
     data.forEach(item => {
         const li = document.createElement("li");
-
         li.innerHTML = `
             ${item.title} (${item.content_type})
             <a href="/producer/edit-education/${item.id}/">
-                <button>Edit</button>
+                <button class="secondary">Edit</button>
             </a>
             <a href="/producer/delete-education/${item.id}/">
-                <button>Delete</button>
+                <button class="secondary">Delete</button>
             </a>
         `;
-
         list.appendChild(li);
     });
 });
+setInterval(loadProducerOrders, 50000); // refresh every 50s
+setInterval(loadNotifications, 5000); // refresh every 5s
 </script>
 </body>
 </html>

@@ -16,13 +16,13 @@ class CustomUserAdmin(UserAdmin):
 
     fieldsets = UserAdmin.fieldsets + (
         ("Marketplace Info", {
-            "fields": ("is_producer", "latitude", "longitude")
+            "fields": ("is_producer", "postcode")
         }),
     )
 
     add_fieldsets = UserAdmin.add_fieldsets + (
         ("Marketplace Info", {
-            "fields": ("is_producer", "latitude", "longitude")
+            "fields": ("is_producer", "postcode")
         }),
     )
 

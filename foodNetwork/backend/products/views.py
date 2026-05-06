@@ -5,24 +5,152 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import Product, EducationalContent
 from .serializers import ProductSerializer, EducationalContentSerializer
-from orders.utils import calculate_distance
-
+from rest_framework import viewsets
+from django.utils import timezone
+from .utils import calculate_distance, postcode_to_coords
+from datetime import timedelta
+from django.db.models import Q
+from users.models import User
+from django.db.models import F, ExpressionWrapper, DecimalField
 
 # ================= PRODUCTS ================= #
+class ProductListView(generics.ListAPIView):
+    serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Product.objects.filter(
+            is_active=True,
+            is_recalled=False,
+            stock_quantity__gt=0
+        ).select_related("producer")
+
+        # ------------------------
+        # FILTERS
+        # ------------------------
+        category = self.request.query_params.get("category")
+        search = self.request.query_params.get("search")
+        producer = self.request.query_params.get("producer")
+        organic = self.request.query_params.get("organic")
+        max_distance = self.request.query_params.get("max_distance")
+
+        if category:
+            queryset = queryset.filter(category=category)
+
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(description__icontains=search) |
+                Q(origin_farm__icontains=search) |
+                Q(producer__username__icontains=search)
+            )
+
+        if producer:
+            queryset = queryset.filter(producer__username=producer)
+
+        if organic == "true":
+            queryset = queryset.filter(is_organic=True)
+
+        if max_distance:
+            max_distance = float(max_distance)
+
+        # ------------------------
+        # ANNOTATIONS
+        # ------------------------
+        queryset = queryset.annotate(
+            discounted_price_calc=ExpressionWrapper(
+                F("price") * (1 - F("discount") / 100),
+                output_field=DecimalField()
+            ),
+            discount_amount=ExpressionWrapper(
+                F("price") * F("discount") / 100,
+                output_field=DecimalField()
+            )
+        )
+
+        # ------------------------
+        # SORTING
+        # ------------------------
+        ordering = self.request.query_params.get("ordering")
+
+        if ordering == "price_asc":
+            queryset = queryset.order_by("discounted_price_calc")
+        elif ordering == "price_desc":
+            queryset = queryset.order_by("-discounted_price_calc")
+        elif ordering == "newest":
+            queryset = queryset.order_by("-created_at")
+        elif ordering == "discount":
+            queryset = queryset.order_by("-discount_amount")
+        else:
+            queryset = queryset.order_by("-created_at")
+
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        user = request.user
+        max_distance = request.query_params.get("max_distance")
+        today = timezone.now().date()
+
+        # expiry logic
+        expiring_products = queryset.filter(
+            best_before_date__isnull=False,
+            best_before_date__lte=today + timedelta(days=2)
+        )
+
+        for product in expiring_products:
+            product.auto_apply_expiry_discount()
+
+        serializer = self.get_serializer(queryset, many=True)
+        data = serializer.data
+
+        # USE STORED COORDINATES
+        filtered_data = []
+
+        for i, product in enumerate(queryset):
+            producer = product.producer
+
+            if (
+                producer.latitude is not None and
+                producer.longitude is not None and
+                user.latitude is not None and
+                user.longitude is not None
+            ):
+                distance = calculate_distance(
+                    producer.latitude,
+                    producer.longitude,
+                    user.latitude,
+                    user.longitude
+                )
+
+                # APPLY FILTER HERE
+                if max_distance and float(distance) > float(max_distance):
+                    continue  # skip product
+
+                data[i]["food_miles"] = round(distance, 2)
+
+            else:
+                data[i]["food_miles"] = None
+
+            filtered_data.append(data[i])
+
+        return Response(filtered_data)
 
 class ProductListCreateView(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Only return products for logged-in producer
         return Product.objects.filter(producer=self.request.user)
 
     def perform_create(self, serializer):
         if not self.request.user.is_producer:
             raise PermissionDenied("Only producers can create products")
-        serializer.save(producer=self.request.user)
 
+        serializer.save(
+            producer=self.request.user,
+            origin_farm=self.request.data.get("origin_farm") or self.request.user.username
+        )
 
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ProductSerializer
@@ -86,6 +214,30 @@ class ProductSearchView(APIView):
         serializer = ProductSerializer(products, many=True)
         return Response(serializer.data)
 
+class ProductFilterOptionsView(APIView):
+    def get(self, request):
+
+        # Clean category choices
+        categories = [
+            {"value": c[0], "label": c[1]}
+            for c in Product.CATEGORY_CHOICES
+            if c[0]  # filter out empty keys
+        ]
+
+        # Distinct producers WITH products
+        producers = (
+            User.objects
+            .filter(product__isnull=False)
+            .exclude(username__isnull=True)
+            .exclude(username__exact="")
+            .values("username")
+            .distinct()
+        )
+
+        return Response({
+            "categories": categories,
+            "producers": list(producers)
+        })
 
 # ================= EDUCATIONAL CONTENT ================= #
 
@@ -116,3 +268,16 @@ class EducationalContentDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_destroy(self, instance):
         instance.delete()
+
+class EducationalContentListView(generics.ListAPIView):
+    serializer_class = EducationalContentSerializer
+    def get_queryset(self):
+        queryset = EducationalContent.objects.all()
+        content_type = self.request.query_params.get("type")
+        producer = self.request.query_params.get("producer")
+
+        if content_type:
+            queryset = queryset.filter(content_type=content_type)
+        if producer:
+            queryset = queryset.filter(producer__username=producer)
+        return queryset.order_by("-created_at")

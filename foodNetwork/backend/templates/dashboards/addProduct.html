@@ -1,75 +1,76 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
 <head>
-<title>Add Product</title>
+    <title>Add Product</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
 </head>
 <input type="hidden" id="csrfToken" value="{{ csrf_token }}">
 <body>
 
-<h2>Add New Product</h2>
+<h2 class="header">Add New Product</h2>
 
-<form id="productForm">
+<form class="card" id="productForm">
+    <label>Product Name:</label>
+    <input type="text" name="name" placeholder="Product Name" required><br>
+    <label>Description:</label><br>
+    <textarea name="description" placeholder="Description"></textarea><br>
+    <label>Price (£):</label>
+    <input type="number" step="0.01" name="price" placeholder="Price" required><br>
+    
+    <label>Category:</label><br>
+    <select name="category">
+        <option value="vegetables">Vegetables</option>
+        <option value="dairy">Dairy</option>
+        <option value="bakery">Bakery</option>
+        <option value="preserves">Preserves</option>
+        <option value="seasonal">Seasonal</option>
+    </select><br>
 
-<input type="text" name="name" placeholder="Product Name" required><br>
-<textarea name="description" placeholder="Description"></textarea><br>
-<input type="number" step="0.01" name="price" placeholder="Price" required><br>
+    <label>Organic Certified? (Tick box for yes):</label><br><input type="checkbox" name="is_organic"><br>
+    <label>Allergen Information:</label><br>
+    <textarea name="allergen_info" placeholder="Allergen Info"></textarea><br>
+    <label>Harvest Date:</label>
+    <input type="date" name="harvest_date"><br>
+    <label>Origin Farm (optional):</label>
+    <input type="text" name="origin_farm" placeholder="Farm name (optional)"><br>
+    <label>Best Before:</label>
+    <input type="date" name="best_before_date"><br>
+    <label>Available From:</label>
+    <input type="date" name="available_from"><br>
+    <label>Available To:</label>
+    <input type="date" name="available_to"><br>
+    <label>Stock Quantity:</label>
+    <input type="number" name="stock_quantity"><br>
 
-<select name="category">
-    <option value="vegetables">Vegetables</option>
-    <option value="dairy">Dairy</option>
-    <option value="bakery">Bakery</option>
-    <option value="preserves">Preserves</option>
-    <option value="seasonal">Seasonal</option>
-</select><br>
-
-<label>Organic:</label>
-<input type="checkbox" name="is_organic"><br>
-
-<textarea name="allergen_info" placeholder="Allergen Info"></textarea><br>
-
-<label>Best Before:</label>
-<input type="date" name="best_before_date"><br>
-
-<label>Available From:</label>
-<input type="date" name="available_from"><br>
-
-<label>Available To:</label>
-<input type="date" name="available_to"><br>
-
-<label>Stock Quantity:</label>
-<input type="number" name="stock_quantity"><br>
-
-<button type="submit">Create Product</button>
-
+    <button type="submit">Create Product</button>
 </form>
-
+{% comment %} ##### SCRIPT ##### {% endcomment %}
 <script>
 // Date Restrictions
 const today = new Date().toISOString().split("T")[0];
-
 document.querySelector('[name="best_before_date"]').min = today;
 document.querySelector('[name="available_from"]').min = today;
 document.querySelector('[name="available_to"]').min = today;
-
 // Form Submit 
 document.getElementById("productForm").addEventListener("submit", function(e) {
     e.preventDefault();
-
     const data = {
         name: this.name.value,
         description: this.description.value,
-        price: this.price.value,
+        price: parseFloat(this.price.value),
         category: this.category.value,
         is_organic: this.is_organic.checked,
+        origin_farm: this.origin_farm.value || null,
         allergen_info: this.allergen_info.value,
-        best_before_date: this.best_before_date.value || null,
-        available_from: this.available_from.value || null,
-        available_to: this.available_to.value || null,
-        stock_quantity: this.stock_quantity.value || 0
+        harvest_date: this.harvest_date.value ? this.harvest_date.value : null,
+        best_before_date: this.best_before_date.value ? this.best_before_date.value : null,
+        available_from: this.available_from.value ? this.available_from.value : null,
+        available_to: this.available_to.value ? this.available_to.value : null,
+        stock_quantity: parseInt(this.stock_quantity.value || 0)
     };
-
     const csrfToken = document.getElementById("csrfToken").value;
-
     fetch("/api/products/", {
         method: "POST",
         headers: {
@@ -80,15 +81,20 @@ document.getElementById("productForm").addEventListener("submit", function(e) {
         body: JSON.stringify(data)
     })
     .then(async res => {
-        const responseData = await res.json();
-
-        if (!res.ok) {
-            console.error("BACKEND ERROR:", responseData);
-            alert(JSON.stringify(responseData));
-            throw new Error("Failed");
+        const text = await res.text();
+        try {
+            const responseData = JSON.parse(text);
+            if (!res.ok) {
+                console.error("BACKEND ERROR:", responseData);
+                alert(JSON.stringify(responseData));
+                throw new Error("Failed");
+            }
+            return responseData;
+        } catch {
+            console.error("RAW RESPONSE:", text);
+            alert("Server error - check console");
+            throw new Error("Invalid JSON");
         }
-
-        return responseData;
     })
     .then(() => {
         alert("Product created!");
@@ -97,6 +103,5 @@ document.getElementById("productForm").addEventListener("submit", function(e) {
     .catch(err => console.error(err));
 });
 </script>
-
 </body>
 </html>

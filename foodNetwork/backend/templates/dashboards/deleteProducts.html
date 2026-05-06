@@ -1,22 +1,29 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
+<head>
+    <title>Delete Product</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
 <body>
 
 <input type="hidden" id="csrfToken" value="{{ csrf_token }}">
+<div class="card">
+    <h2>Delete Product?</h2>
 
-<h2>Delete Product?</h2>
+    <button id="deleteBtn">Yes Delete</button>
+    <a href="/api/orders/dashboard/producer/view/">
+        <button>Cancel</button>
+    </a>
+</div>
 
-<button id="deleteBtn">Yes Delete</button>
-<a href="/api/orders/dashboard/producer/view/">
-    <button>Cancel</button>
-</a>
-
+{% comment %} ##### SCRIPT ##### {% endcomment %}
 <script>
 const id = window.location.pathname.split("/").filter(Boolean).pop();
 const csrfToken = document.getElementById("csrfToken").value;
 
 document.getElementById("deleteBtn").onclick = () => {
-
     fetch(`/api/products/${id}/`, {
         method: "DELETE",
         headers: {
@@ -40,6 +47,5 @@ document.getElementById("deleteBtn").onclick = () => {
     });
 };
 </script>
-
 </body>
 </html>

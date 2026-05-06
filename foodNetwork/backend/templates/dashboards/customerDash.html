@@ -1,54 +1,565 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
 <head>
-<title>Customer Dashboard</title>
+    <title>Customer Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://js.stripe.com/v3/"></script>
+    <link rel="stylesheet" href="{% static 'style.css' %}">
 </head>
 
 <body>
-<div style="background:#2e7d32;color:white;padding:15px;">
-<span> Welcome {{ request.user.username }}</span>
-<a href="/change-password/" style="margin-left:20px;color:white;">
-Change Password
-</a>
-<a href="/logout/" style="float:right;color:white;">Logout</a>
+<div style="background:#2c3e50;color:white;padding:15px;">
+    <span> Welcome {{ request.user.username }}</span>
+    <a href="/change-password/" style="margin-left:20px;color:white;">Change Password</a>
+    <a href="/logout/" style="float:right;color:white;">Logout</a>
 </div>
 
-<h1>Customer Dashboard</h1>
+<h1 class="header">Customer Dashboard</h1>
 
-<h2>Your Cart</h2>
-<ul id="cart"></ul>
+<div class="card">
+    <h2>Updates</h2>
+    <ul id="orderUpdates"></ul>
+</div>
 
-<h2>Your Orders</h2>
-<ul id="orders"></ul>
+<div class="card">
+    <div class="filters">
 
+        <div class="filter-group">
+            <h3>Search</h3>
+            <input type="text" id="searchBox" placeholder="Search products, farms, producers...">
+        </div>
+
+        <div class="filters-divider"></div>
+
+        <div class="filter-group">
+            <h3>Filters</h3>
+
+            <div class="filter-row">
+                <select id="categoryFilter" onchange="applyFilters()">
+                    <option value="">All Categories</option>
+                </select>
+
+                <select id="producerFilter" onchange="applyFilters()">
+                    <option value="">All Producers</option>
+                </select>
+            </div>
+
+            <div class="filter-row">
+                <select id="sortFilter" onchange="applyFilters()">
+                    <option value="">Sort By</option>
+                    <option value="price_asc">Price ↑</option>
+                    <option value="price_desc">Price ↓</option>
+                    <option value="newest">Newest</option>
+                    <option value="discount">Biggest Discount</option>
+                </select>
+
+                <select id="distanceFilter" onchange="applyFilters()">
+                    <option value="">Any Distance</option>
+                    <option value="5">Within 5 miles</option>
+                    <option value="10">Within 10 miles</option>
+                    <option value="25">Within 25 miles</option>
+                </select>
+            </div>
+
+            <label>
+                <input type="checkbox" id="organicFilter" onchange="applyFilters()">Organic Only 🌱
+            </label>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Browse Products</h2>
+    <ul id="products"></ul>
+</div>
+
+<div class="card">
+    <h2>Your Cart</h2>
+    <ul id="cart"></ul>
+    <h3 id="cartTotal"></h3>
+</div>
+
+<div class="card">
+    <label>
+        Delivery Method:
+        <select id="deliveryMethod">
+            <option value="pickup">Pickup</option>
+            <option value="delivery">Delivery</option>
+        </select>
+    </label>
+
+    <input type="text" id="address" placeholder="Enter address" style="display:none;">
+    <div id="card-element" style="padding:10px;border:1px solid #ccc;"></div><br>
+    <button class="secondary" onclick="checkout()">Checkout</button>
+</div>
+
+<div class="card">
+    <h2>Your Orders</h2>
+    <ul id="orders" class="card"></ul>
+</div>
+
+{% comment %} ##### SCRIPT ##### {% endcomment %}
 <script>
-
-fetch("/api/orders/dashboard/customer/")
-.then(response => response.json())
-.then(data => {
-
-    const cart = document.getElementById("cart");
-
-    data.cart_items.forEach(item => {
-        let li = document.createElement("li");
-        li.textContent =
-            item.product + " x " + item.quantity;
-        cart.appendChild(li);
-    });
-
-    const orders = document.getElementById("orders");
-
-    data.orders.forEach(order => {
-        let li = document.createElement("li");
-        li.textContent =
-            order.product + " x " + order.quantity;
-        orders.appendChild(li);
-    });
-
+document.getElementById("deliveryMethod").addEventListener("change", function() {
+    const address = document.getElementById("address");
+    address.style.display = this.value === "delivery" ? "block" : "none";
 });
 
+let stripe;
+let card;
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadFilters(); 
+    loadFilterOptions();
+    loadProducts({
+        search: "",
+        category: "",
+        producer: "",
+        organic: false
+    });
+    refreshUI();
+    loadOrderUpdates();
+    stripe = Stripe("pk_test_51TAarmLP05uUUn7VkP9MBmLo4ssALNLt7j15PYHV8LCQZmZp7x6wqfQkTk3c7OljQL2fefcXIwEwF7li2mLaU7sj00QOBoMaFa");
+    const elements = stripe.elements();
+    card = elements.create("card");
+    card.mount("#card-element");
+});
+
+function refreshUI() {
+    loadCart();
+    loadOrders();
+}
+
+function getCSRFToken() {
+    return document.cookie
+        .split("; ")
+        .find(row => row.startsWith("csrftoken"))
+        ?.split("=")[1];
+}
+
+function loadFilters() {
+    fetch("/api/products/filters/")
+    .then(res => res.json())
+    .then(data => {
+
+        const categorySelect = document.getElementById("categoryFilter");
+        const producerSelect = document.getElementById("producerFilter");
+
+        data.categories.forEach(c => {
+            let option = document.createElement("option");
+            option.value = c;
+            option.textContent = c;
+            categorySelect.appendChild(option);
+        });
+
+        data.producers.forEach(p => {
+            let option = document.createElement("option");
+            option.value = p;
+            option.textContent = p;
+            producerSelect.appendChild(option);
+        });
+    });
+}
+
+function applyFilters() {
+    loadProducts({
+        search: document.getElementById("searchBox")?.value || "",
+        category: document.getElementById("categoryFilter")?.value || "",
+        producer: document.getElementById("producerFilter")?.value || "",
+        organic: document.getElementById("organicFilter")?.checked || false,
+        sort: document.getElementById("sortFilter")?.value || "",
+        distance: document.getElementById("distanceFilter")?.value || ""
+    });
+}
+
+function loadProducts(filters = {}) {
+
+    let url = "/api/products/list/?";
+
+    if (filters.search) {
+        url += `search=${encodeURIComponent(filters.search)}&`;
+    }
+
+    if (filters.category) {
+        url += `category=${encodeURIComponent(filters.category)}&`;
+    }
+
+    if (filters.producer) {
+        url += `producer=${encodeURIComponent(filters.producer)}&`;
+    }
+
+    if (filters.organic) {
+        url += `organic=true&`;
+    }
+
+    if (filters.sort) {
+        url += `ordering=${filters.sort}&`;
+    }
+
+    if (filters.distance) {
+        url += `max_distance=${filters.distance}&`;
+    }
+
+    fetch(url)
+    .then(res => res.json())
+    .then(data => {
+        const list = document.getElementById("products");
+        list.innerHTML = "";
+
+        // discounted first
+        data.sort((a, b) => {
+            if (a.is_discounted === b.is_discounted) return 0;
+            return a.is_discounted ? -1 : 1;
+        });
+
+        data.forEach(p => {
+            if (p.is_recalled) return;
+            let li = document.createElement("li");
+            li.innerHTML = `
+                <strong>${p.name}</strong><br>
+                ${
+                    p.is_discounted
+                    ? `<span style="color:red;">
+                        🔻 ${p.discount_percentage}% OFF
+                    </span><br>`
+                    : ""
+                }
+                £${parseFloat(p.discounted_price).toFixed(2)}
+                ${p.is_discounted 
+                    ? `<span style="text-decoration:line-through;">
+                        £${parseFloat(p.price).toFixed(2)}
+                    </span>`
+                    : ""
+                }
+                <br>🌍 Food Miles: ${p.food_miles !== null ? p.food_miles + " miles" : "N/A"}
+                <br>${p.allergen_info ? "Allergens: " + p.allergen_info : ""}
+                <br>Farm: ${p.origin_farm || p.producer_name}<br>
+                ${p.description ? "Description: " + p.description : ""}<br>
+                ${p.is_organic ? "🌱 Organic" : ""}<br>
+                ${p.harvest_date 
+                    ? `Harvested: ${new Date(p.harvest_date).toLocaleDateString()}<br>` 
+                    : ""
+                }
+                ${p.best_before_date 
+                    ? `Best Before: ${new Date(p.best_before_date).toLocaleDateString()}<br>` 
+                    : ""
+                }
+                ${p.stock_quantity > 0 ? `In Stock: ${p.stock_quantity}` : "Out of Stock"}<br>
+                <button class="secondary" onclick="addToCart(${p.id})">Add</button>
+            `;
+            list.appendChild(li);
+        });
+    });
+}
+
+document.getElementById("searchBox").addEventListener("input", (e) => {
+    applyFilters();
+});
+
+function loadFilterOptions() {
+    fetch("/api/products/filters/")
+    .then(res => res.json())
+    .then(data => {
+
+        const categorySelect = document.getElementById("categoryFilter");
+        const producerSelect = document.getElementById("producerFilter");
+
+        // Reset (prevents duplicates on reload)
+        categorySelect.innerHTML = '<option value="">All Categories</option>';
+        producerSelect.innerHTML = '<option value="">All Producers</option>';
+
+        // Categories
+        data.categories.forEach(cat => {
+            if (!cat.value) return;
+            const option = document.createElement("option");
+            option.value = cat.value;
+            option.textContent = cat.label;
+            categorySelect.appendChild(option);
+        });
+
+        // Producers
+        data.producers.forEach(prod => {
+            if (!prod.username) return;
+            const option = document.createElement("option");
+            option.value = prod.username;
+            option.textContent = prod.username;
+            producerSelect.appendChild(option);
+        });
+    });
+}
+
+function addToCart(productId) {
+    // instantly update UI (fake)
+    console.log("Adding instantly...");
+    fetch("/api/cart/items/", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify({
+            product: productId,
+            quantity: 1
+        })
+    })
+    .then(() => refreshUI());
+}
+
+function updateQuantity(itemId, change) {
+    fetch(`/api/cart/items/${itemId}/`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify({ change: change })
+    })
+    .then(() => refreshUI());
+}
+
+function loadCart() {
+    fetch("/api/orders/dashboard/customer/")
+    .then(res => res.json())
+    .then(data => {
+        const cart = document.getElementById("cart");
+        const total = document.getElementById("cartTotal");
+        cart.innerHTML = "";
+        (data.cart_items || []).forEach(item => {
+            let li = document.createElement("li");
+            li.innerHTML = `
+                ${item.product_name} x ${item.quantity}
+                (£${parseFloat(item.subtotal).toFixed(2)})
+                <button class="secondary" onclick="updateQuantity(${item.id}, 1)">+</button>
+                <button class="secondary" onclick="updateQuantity(${item.id}, -1)">-</button>
+            `;
+            cart.appendChild(li);
+        });
+        total.textContent = "Total: £" + data.cart_total.toFixed(2);
+    });
+}
+
+function checkout() {
+    const method = document.getElementById("deliveryMethod").value;
+    const address = document.getElementById("address").value;
+    if (method === "delivery" && !address) {
+        alert("Please enter a address for delivery");
+        return;
+    }
+    let date = new Date();
+    date = new Date(date.getTime() + (49 * 60 * 60 * 1000)); // 49 hours ahead
+    fetch("/api/checkout/", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify({
+            delivery_date: date.toISOString().slice(0, 19),
+            delivery_method: method,
+            address: address
+        })
+    })
+    .then(async res => {
+        const text = await res.text(); 
+        try {
+            const data = JSON.parse(text);
+            if (!res.ok) throw data;
+            return data;
+        } catch (e) {
+            console.error("RAW RESPONSE:", text);
+            throw data;
+        }
+    })
+    .then(async data => {
+        const result = await stripe.confirmCardPayment(data.client_secret, {
+            payment_method: {
+                card: card,
+                billing_details: {
+                    name: "Test User"
+                }
+            }
+        });
+        console.log(result);
+        if (result.error) {
+            console.error("Stripe error FULL:", result.error);
+            alert(result.error.message);
+            return;
+        }
+        if (result.paymentIntent && result.paymentIntent.status === "succeeded") {
+            await fetch(`/api/orders/confirm-payment/${data.order_id}/`, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": getCSRFToken()
+                }
+            });
+            alert("Payment successful!");
+            refreshUI();
+        }
+    })
+    .catch(err => {
+        console.error("Checkout error:", err);
+        alert("Order created, but payment failed. Please retry payment.");
+        startPaymentPolling(); // keep checking status
+    });
+}
+
+let paymentPoller = null;
+
+function startPaymentPolling() {
+    if (paymentPoller) return;
+    paymentPoller = setInterval(() => {
+        checkPaymentUpdates();
+    }, 3000);
+}
+
+function stopPaymentPolling() {
+    if (paymentPoller) {
+        clearInterval(paymentPoller);
+        paymentPoller = null;
+    }
+}
+
+function checkPaymentUpdates() {
+    fetch("/api/orders/dashboard/customer/", { cache: "no-store" })
+    .then(res => res.json())
+    .then(data => {
+        const hasProcessing = (data.orders || []).some(
+            item => item.payment_status === "processing"
+        );
+        if (hasProcessing) {
+            loadOrders(); // update UI
+        } else {
+            stopPaymentPolling(); // stop when all paid
+        }
+    });
+}
+
+function loadOrderUpdates() {
+    fetch("/api/orders/notifications/customer/", { credentials: "include" })
+    .then(res => res.json())
+    .then(data => {
+        const list = document.getElementById("orderUpdates");
+        list.innerHTML = "";
+        data
+        .filter(n => !n.is_read)
+        .forEach(n => {
+            const li = document.createElement("li");
+            let style = "";
+            if (n.notification_type === "alert") {
+                style = "color:red; font-weight:bold;";
+            } else if (n.notification_type === "discount") {
+                style = "color:green;";
+            }
+            li.innerHTML = `
+                <div style="${style}">
+                    ${n.message}
+                </div>
+                <small>${new Date(n.created_at).toLocaleString()}</small>
+                <br>
+                <button onclick="markOneRead(${n.id})">Mark as read</button>
+            `;
+            list.appendChild(li);
+        });
+    });
+}
+
+function markOneRead(notificationId) {
+    fetch(`/api/orders/notifications/${notificationId}/read/`, {
+        method: "PATCH",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    })
+    .then(() => {
+        loadOrderUpdates(); // refresh cleanly
+    });
+}
+
+function loadOrders() {
+    fetch("/api/orders/dashboard/customer/", { cache: "no-store" })
+    .then(res => res.json())
+    .then(data => {
+        const orders = document.getElementById("orders");
+        orders.innerHTML = "";
+        const grouped = {};
+        (data.orders || []).forEach(item => {
+            const orderId = item.order_id;
+            if (!grouped[orderId]) {
+                grouped[orderId] = {
+                    date: item.order_date,
+                    status: item.status,
+                    items: [],
+                    total: 0
+                };
+            }
+            grouped[orderId].items.push(item);
+            grouped[orderId].total += parseFloat(item.subtotal);
+        });
+        Object.keys(grouped).forEach(orderId => {
+            let order = grouped[orderId];
+            let li = document.createElement("li");
+            const paymentStatus = order.items[0]?.payment_status || "processing";
+            li.innerHTML = `
+                <strong>Order #${orderId}</strong><br>
+                Date: ${new Date(order.date).toLocaleString()}<br>
+                Payment Status: <strong>${formatPayment(paymentStatus)}</strong><br>
+                <a href="/api/orders/report/${orderId}/" target="_blank">
+                    🌍 Download Environmental Report
+                </a>
+                <ul>
+                ${order.items.map(i => `
+                    <li>
+                        ${i.product_name} x ${i.quantity} 
+                        ${i.food_miles 
+                            ? `<br>🌍 ${i.food_miles.toFixed(1)} miles`
+                            : ""
+                        }
+                        (£${parseFloat(i.subtotal).toFixed(2)})
+                        <br>Status: <strong>${formatStatus(i.status)}</strong>
+                        ${i.delivery_time 
+                            ? `<br>Delivery: ${new Date(i.delivery_time).toLocaleString()}`
+                            : ""
+                        }
+                    </li>
+                `).join("")}
+                </ul>
+                <strong>Total: £${order.total.toFixed(2)}</strong>
+                <hr>
+            `;
+            orders.appendChild(li);
+        });
+    });
+}
+
+function formatStatus(status) {
+    switch(status) {
+        case "pending": return "🕐 Pending";
+        case "ready": return "📦 Ready for Collection";
+        case "shipped": return "🚚 Shipped";
+        case "completed": return "✅ Completed";
+        default: return status;
+    }
+}
+
+function formatPayment(status) {
+    switch(status) {
+        case "processing": return "⏳ Processing";
+        case "paid": return "💳 Paid";
+        default: return status;
+    }
+}
+
+function markNotificationsRead() {
+    fetch("/api/orders/notifications/read/", {
+        method: "PATCH",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    });
+}
 </script>
-
 </body>
-
 </html>

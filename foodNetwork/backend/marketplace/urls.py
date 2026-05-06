@@ -15,18 +15,21 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from users.views import login_home, logout_user, change_password
+from users.views import logout_user, change_password
 from orders.views import add_product_page, add_education_page, edit_product_page, delete_product_page, edit_education_page, delete_education_page
+from users.views import RegisterView, register_page, home_page
 
 urlpatterns = [
-    path("", login_home),
+    path("", home_page),
     path("change-password/", change_password),
     path("", include("users.urls")),
     path('admin/', admin.site.urls),
+    path("api/", include("orders.urls")),
     path('api/products/', include('products.urls')),
     path('api/orders/', include('orders.urls')),
-    path('api/users/', include('users.urls')),
     path('api-auth/', include('rest_framework.urls')),
+    path("register/", register_page, name="register"),
+    path("api/register/", RegisterView.as_view(), name="api-register"),
     path("logout/", logout_user),
     path("producer/add-product/", add_product_page),
     path("producer/add-education/", add_education_page),

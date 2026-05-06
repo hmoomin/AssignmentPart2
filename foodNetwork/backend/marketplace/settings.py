@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,11 +23,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-$hm&@_q&&+&r=!as4b5h3@10adef_%n2x_4**6wbr-07m---gh'
-
+STRIPE_SECRET_KEY = "sk_test_51TAarmLP05uUUn7VNiCJ96IajLweuyptSnEAARBKWCllXTnGSMOW7XKV1lzJm9gZwzqFR8hdKEmjh7KJS91jJWOn00v4wWRZOt"
+STRIPE_PUBLIC_KEY = "pk_test_51TAarmLP05uUUn7VkP9MBmLo4ssALNLt7j15PYHV8LCQZmZp7x6wqfQkTk3c7OljQL2fefcXIwEwF7li2mLaU7sj00QOBoMaFa"
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 AUTH_USER_MODEL = 'users.User'
 
@@ -129,6 +131,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
 STATIC_URL = '/static/'
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static')
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
