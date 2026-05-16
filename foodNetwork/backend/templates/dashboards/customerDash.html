@@ -233,7 +233,7 @@ function loadProducts(filters = {}) {
                     : ""
                 }
                 <br>🌍 Food Miles: ${p.food_miles !== null ? p.food_miles + " miles" : "N/A"}
-                <br>${p.allergen_info ? `<strong>Allergens: </strong>${p.allergen_info}` : ""}
+                <br>${p.allergen_info ? `<strong>⚠️ Allergens ⚠️: </strong>${p.allergen_info}` : ""}
                 <br>Farm: ${p.origin_farm || p.producer_name}<br>
                 ${p.description ? "Description: " + p.description : ""}<br>
                 ${p.is_organic ? "🌱 Organic" : ""}<br>
