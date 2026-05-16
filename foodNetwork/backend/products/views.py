@@ -42,7 +42,10 @@ class ProductListView(generics.ListAPIView):
                 Q(name__icontains=search) |
                 Q(description__icontains=search) |
                 Q(origin_farm__icontains=search) |
-                Q(producer__username__icontains=search)
+                Q(producer__username__icontains=search)|
+                Q(organic__icontains=search)|
+                Q(category__icontains=search)|
+                Q(max_distance__icontains=search)
             )
 
         if producer:
