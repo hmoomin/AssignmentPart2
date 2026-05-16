@@ -21,6 +21,16 @@ class Product(models.Model):
         ("seasonal", "Seasonal"),
     ]
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+
+    UNIT_CHOICES = [
+        ("item", "Per Item"),
+        ("kg", "Per Kg"),
+        ("g", "Per Gram"),
+        ("litre", "Per Litre"),
+        ("dozen", "Per Dozen"),
+        ("pack", "Per Pack"),
+    ]
+    unit = models.CharField(max_length=10, choices=UNIT_CHOICES, default="item")
     # Product quality + compliance
     is_organic = models.BooleanField(default=False)
     allergen_info = models.TextField(blank=True)

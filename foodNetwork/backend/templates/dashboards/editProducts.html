@@ -17,6 +17,15 @@
         <h3>Name: </h3><input id="name"><br>
         <h3>Description: </h3><textarea id="description"></textarea><br>
         <h3>Price: </h3><input type="number" step="0.01" id="price"><br>
+        <h3>Unit:</h3><br>
+        <select id="unit">
+        <option value="item">Per Item</option>
+        <option value="kg">Per Kg</option>
+        <option value="g">Per Gram</option>
+        <option value="litre">Per Litre</option>
+        <option value="dozen">Per Dozen</option>
+        <option value="pack">Per Pack</option>
+        </select><br>
         <h3>Categories:</h3><br>
         <select id="category">
         <option value="vegetables">Vegetables</option>
@@ -47,6 +56,7 @@ const form = document.getElementById("form");
 const nameInput = document.getElementById("name");
 const descriptionInput = document.getElementById("description");
 const priceInput = document.getElementById("price");
+const unitInput = document.getElementById("unit");
 const categoryInput = document.getElementById("category");
 const organicInput = document.getElementById("is_organic");
 const allergenInput = document.getElementById("allergen_info");
@@ -69,6 +79,7 @@ fetch(`/api/products/${id}/`, { credentials: "include" })
     nameInput.value = p.name;
     descriptionInput.value = p.description;
     priceInput.value = p.price;
+    unitInput.value = p.unit;
     categoryInput.value = p.category;
     organicInput.checked = p.is_organic;
     allergenInput.value = p.allergen_info;
@@ -92,6 +103,7 @@ form.onsubmit = e => {
             name: nameInput.value,
             description: descriptionInput.value,
             price: priceInput.value,
+            unit: unitInput.value,
             category: categoryInput.value,
             is_organic: organicInput.checked,
             allergen_info: allergenInput.value,

@@ -225,10 +225,10 @@ function loadProducts(filters = {}) {
                     </span><br>`
                     : ""
                 }
-                £${parseFloat(p.discounted_price).toFixed(2)}
+                £${parseFloat(p.discounted_price).toFixed(2)} per ${p.unit}
                 ${p.is_discounted 
                     ? `<span style="text-decoration:line-through;">
-                        £${parseFloat(p.price).toFixed(2)}
+                        £${parseFloat(p.price).toFixed(2)} per ${p.unit}
                     </span>`
                     : ""
                 }

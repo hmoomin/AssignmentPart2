@@ -18,7 +18,15 @@
     <textarea name="description" placeholder="Description"></textarea><br>
     <label>Price (£):</label>
     <input type="number" step="0.01" name="price" placeholder="Price" required><br>
-    
+    <label>Unit:</label><br>
+    <select name="unit">
+        <option value="item">Per Item</option>
+        <option value="kg">Per Kg</option>
+        <option value="g">Per Gram</option>
+        <option value="litre">Per Litre</option>
+        <option value="dozen">Per Dozen</option>
+        <option value="pack">Per Pack</option>
+    </select><br>
     <label>Category:</label><br>
     <select name="category">
         <option value="vegetables">Vegetables</option>
@@ -60,6 +68,7 @@ document.getElementById("productForm").addEventListener("submit", function(e) {
         name: this.name.value,
         description: this.description.value,
         price: parseFloat(this.price.value),
+        unit: this.unit.value,
         category: this.category.value,
         is_organic: this.is_organic.checked,
         origin_farm: this.origin_farm.value || null,

@@ -18,6 +18,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "price",
+            "unit",
             "discounted_price",
             "category",
             "is_organic",
@@ -52,7 +53,7 @@ class ProductSerializer(serializers.ModelSerializer):
     
     def get_discount_percentage(self, obj):
         discount = obj.get_active_discount()
-        return discount.discount_percentage if discount else 0
+        return discount if discount else 0
 
     def get_is_discounted(self, obj):
         return obj.get_active_discount() is not None
