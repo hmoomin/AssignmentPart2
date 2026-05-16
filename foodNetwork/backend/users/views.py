@@ -1,6 +1,6 @@
 from rest_framework import generics
 from .models import User
-from .serializers import UserSerializer
+from .serializers import RegisterSerializer
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -15,7 +15,7 @@ from django.contrib import messages
 
 class RegisterView(APIView):
     def post(self, request):
-        serializer = UserSerializer(data=request.data)
+        serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             role = serializer.validated_data.get("role")
             user = serializer.save(
@@ -32,39 +32,46 @@ def register_page(request):
     if request.method == "POST":
         username = request.POST.get("username")
         password = request.POST.get("password")
+        confirm_password = request.POST.get("confirm_password")
         role = request.POST.get("role")
+        business_name = request.POST.get("business_name")
+        contact_name = request.POST.get("contact_name")
+        email = request.POST.get("email")
+        phone = request.POST.get("phone")
+        address = request.POST.get("address")
         postcode = request.POST.get("postcode")
+
         # --- VALIDATION ---
         if User.objects.filter(username=username).exists():
-            return render(request, "dashboards/register.html", {
-                "error": "Username already exists"
-            })
+            return render(request, "dashboards/register.html", {"error": "Username already exists"})
+        if User.objects.filter(email=email).exists():
+            return render(request, "dashboards/register.html", {"error": "Email already exists"})
+        if password != confirm_password:
+            return render(request, "dashboards/register.html", {"error": "Passwords do not match"})
         if len(password) < 6:
-            return render(request, "dashboards/register.html", {
-                "error": "Password must be at least 6 characters"
-            })
+            return render(request, "dashboards/register.html", {"error": "Password must be at least 6 characters"})
         if not postcode:
-            return render(request, "dashboards/register.html", {
-                "error": "Postcode is required"
-            })
-
-        # --- POSTCODE VALIDATION & GEOCODING ---
+            return render(request, "dashboards/register.html", {"error": "Postcode is required"})
+        # --- POSTCODE VALIDATION ---
         try:
             response = requests.get(f"https://api.postcodes.io/postcodes/{postcode}")
             data = response.json()
             if data["status"] != 200:
-                raise Exception("Invalid postcode")
+                raise Exception()
             latitude = data["result"]["latitude"]
             longitude = data["result"]["longitude"]
         except Exception:
-            return render(request, "dashboards/register.html", {
-                "error": "Invalid postcode entered"
-            })
+            return render(request, "dashboards/register.html", {"error": "Invalid postcode"})
         # --- CREATE USER ---
         user = User.objects.create_user(
             username=username,
             password=password,
             role=role,
+            business_name=business_name,
+            contact_name=contact_name,
+            email=email,
+            phone=phone,
+            address=address,
             postcode=postcode,
             latitude=latitude,
             longitude=longitude,
