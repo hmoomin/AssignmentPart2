@@ -35,6 +35,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     order_status = serializers.CharField(source="order.status", read_only=True)
     payment_status = serializers.CharField(source="order.payment_status", read_only=True)
     food_miles = serializers.SerializerMethodField()
+    customer_name = serializers.CharField(source="customer.username", read_only=True)
 
     class Meta:
         model = OrderItem
@@ -46,6 +47,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "product_name",
             "producer",
             "producer_name",
+            "customer_name",
             "quantity",
             "price",
             "subtotal",
