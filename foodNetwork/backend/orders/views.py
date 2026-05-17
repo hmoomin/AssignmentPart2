@@ -352,6 +352,61 @@ class CartItemUpdateView(APIView):
         item.delete()
         return Response({"message": "Deleted"})
 
+class ReorderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        order = get_object_or_404(Order, id=order_id, customer=request.user)
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        added = []
+        failed = []
+        now = timezone.now().date()
+        
+        for item in order.items.all():
+
+            # product deleted
+            if not item.product:
+                failed.append({
+                    "product": item.product_name,
+                    "reason": "Product no longer exists"
+                })
+                continue
+
+            # expiry check
+            if item.product.best_before_date and item.product.best_before_date < now:
+                failed.append({
+                    "product": item.product.name,
+                    "reason": "Product has expired"
+                })
+                continue
+
+            # out of stock
+            if item.product.stock_quantity <= 0:
+                failed.append({
+                    "product": item.product.name,
+                    "reason": "Out of stock"
+                })
+                continue
+
+            # add to cart
+            cart_item, created = CartItem.objects.get_or_create(
+                cart=cart,
+                product=item.product,
+                defaults={"quantity": item.quantity}
+            )
+
+            if not created:
+                cart_item.quantity += item.quantity
+                cart_item.save()
+
+            added.append(item.product.name)
+
+        return Response({
+            "message": "Reorder complete",
+            "added": added,
+            "failed": failed
+        })
+
 class UpdateOrderItemView(APIView):
     permission_classes = [IsAuthenticated]
 

@@ -547,12 +547,48 @@ function loadOrders() {
                     </li>
                 `).join("")}
                 </ul>
+                <button onclick="reorder(${orderId})">🔁 Reorder</button>
                 <strong>Total: £${order.total.toFixed(2)}</strong>
                 <hr>
             `;
             orders.appendChild(li);
         });
     });
+}
+
+function reorder(orderId) {
+    fetch(`/api/orders/reorder/${orderId}/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    })
+    .then(async res => {
+        const text = await res.text();
+
+        try {
+            const data = JSON.parse(text);
+            if (!res.ok) throw data;
+            return data;
+        } catch (e) {
+            console.error("RAW RESPONSE:", text);
+            throw new Error("Server error");
+        }
+    })
+    .then(data => {
+        let message = "";
+        if (data.added.length > 0) {
+            message += "Added to cart:\n" + data.added.join(", ") + "\n\n";
+        }
+        if (data.failed.length > 0) {
+            message += "Could not add:\n";
+            data.failed.forEach(f => {
+                message += `- ${f.product}: ${f.reason}\n`;
+            });
+        }
+        alert(message);
+        refreshUI();
+    })
 }
 
 function formatStatus(status) {
