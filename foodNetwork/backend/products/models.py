@@ -46,6 +46,7 @@ class Product(models.Model):
     stock_quantity = models.IntegerField(default=0)
     is_recalled = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    low_stock_threshold = models.IntegerField(default=5)
 
     discount_percentage = models.DecimalField(
         max_digits=5,
@@ -109,6 +110,21 @@ class Product(models.Model):
             return False
 
         return True
+    
+    def check_low_stock(self):
+        if self.stock_quantity <= self.low_stock_threshold:
+            already_notified = Notification.objects.filter(
+                user=self.producer,
+                notification_type="alert",
+                message__icontains=self.name
+            ).exists()
+
+            if not already_notified:
+                Notification.objects.create(
+                    user=self.producer,
+                    message=f"⚠️ Low stock: {self.name} has only {self.stock_quantity} left.",
+                    notification_type="alert"
+                )
 
     def is_in_season(self):
         today = timezone.now().date()
@@ -129,6 +145,22 @@ class Product(models.Model):
                 Decimal("1") - Decimal(self.discount_percentage) / Decimal("100")
             )
         return self.price
+
+    def handle_expiry(self):
+        if self.best_before_date:
+            today = timezone.now().date()
+
+            if today > self.best_before_date:
+                if self.is_active:
+                    self.is_active = False
+                    self.status = "disabled"
+                    super().save(update_fields=["is_active", "status"])
+
+                    Notification.objects.create(
+                        user=self.producer,
+                        message=f"❌ {self.name} has expired and was removed from sale.",
+                        notification_type="alert"
+                    )
 
     def auto_apply_expiry_discount(self):
         if self.best_before_date:
@@ -161,6 +193,7 @@ class Product(models.Model):
         super().save(*args, **kwargs)
         try:
             self.auto_apply_expiry_discount()
+            self.check_low_stock()
         except Exception as e:
             print("Discount error:", e)
 

@@ -105,6 +105,14 @@ class ProductListView(generics.ListAPIView):
         serializer = self.get_serializer(queryset, many=True)
         data = serializer.data
 
+        expired_products = queryset.filter(
+            best_before_date__lt=today,
+            is_active=True
+        )
+
+        for product in expired_products:
+            product.handle_expiry()
+
         # USE STORED COORDINATES
         filtered_data = []
 
