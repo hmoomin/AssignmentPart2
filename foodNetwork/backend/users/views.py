@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 import requests
 from django.contrib import messages
+from rest_framework.permissions import IsAuthenticated
 
 
 class RegisterView(APIView):
@@ -26,6 +27,16 @@ class RegisterView(APIView):
                 "role": user.role
             }, status=201)
         return Response(serializer.errors, status=400)
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        return Response({
+            "address": user.address,
+            "postcode": user.postcode
+        })
 
 @csrf_protect
 def register_page(request):

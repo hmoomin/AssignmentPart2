@@ -89,7 +89,8 @@
         </select>
     </label>
 
-    <input type="text" id="address" placeholder="Enter address" style="display:none;">
+    <input type="text" id="addressLine" placeholder="Enter address" style="display:none;">
+    <input type="text" id="postcode" placeholder="Enter postcode" style="display:none;">
     <div id="card-element" style="padding:10px;border:1px solid #ccc;"></div><br>
     <button class="secondary" onclick="checkout()">Checkout</button>
 </div>
@@ -102,8 +103,25 @@
 {% comment %} ##### SCRIPT ##### {% endcomment %}
 <script>
 document.getElementById("deliveryMethod").addEventListener("change", function() {
-    const address = document.getElementById("address");
-    address.style.display = this.value === "delivery" ? "block" : "none";
+    const addressField = document.getElementById("addressLine");
+    const postcodeField = document.getElementById("postcode");
+    if (this.value === "delivery") {
+        addressField.style.display = "block";
+        postcodeField.style.display = "block";
+
+        fetch("/users/profile/", { credentials: "include" })
+        .then(res => res.json())
+        .then(data => {
+            addressField.value = data.address || "";
+            postcodeField.value = data.postcode || "";
+        });
+
+    } else {
+        addressField.style.display = "none";
+        postcodeField.style.display = "none";
+        addressField.value = "";
+        postcodeField.value = "";
+    }
 });
 
 let stripe;
@@ -342,8 +360,11 @@ function loadCart() {
 
 function checkout() {
     const method = document.getElementById("deliveryMethod").value;
-    const address = document.getElementById("address").value;
-    if (method === "delivery" && !address) {
+    const addressLine = document.getElementById("addressLine").value;
+    const postcode = document.getElementById("postcode").value;
+    const address = `${addressLine} ${postcode}`.trim();
+
+    if (method === "delivery" && (!addressLine || !postcode)) {
         alert("Please enter a address for delivery");
         return;
     }
