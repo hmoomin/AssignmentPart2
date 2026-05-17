@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Product, EducationalContent
+from .models import Product, EducationalContent, Review
 from .serializers import ProductSerializer, EducationalContentSerializer
 from rest_framework import viewsets
 from django.utils import timezone
@@ -12,6 +12,7 @@ from datetime import timedelta
 from django.db.models import Q
 from users.models import User
 from django.db.models import F, ExpressionWrapper, DecimalField
+from orders.models import OrderItem
 
 # ================= PRODUCTS ================= #
 class ProductListView(generics.ListAPIView):
@@ -167,6 +168,57 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         instance.delete()
 
+# ================= REVIEWS ================= #
+
+class CreateReviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        product_id = request.data.get("product")
+        rating = request.data.get("rating")
+        comment = request.data.get("comment", "")
+        anonymous = request.data.get("anonymous", False)
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response({"error": "Product not found"}, status=404)
+        # must have ordered
+        has_ordered = OrderItem.objects.filter(
+            order__customer=request.user,
+            product=product
+        ).exists()
+        if not has_ordered:
+            return Response({
+                "error": "You can only review products you have purchased"
+            }, status=403)
+        # prevent duplicate reviews
+        if Review.objects.filter(user=request.user, product=product).exists():
+            return Response({
+                "error": "You already reviewed this product"
+            }, status=400)
+        review = Review.objects.create(
+            user=request.user,
+            product=product,
+            rating=rating,
+            comment=comment,
+            anonymous=anonymous
+        )
+        return Response({"message": "Review created"})
+    
+class ProductReviewListView(APIView):
+    def get(self, request, product_id):
+        reviews = Review.objects.filter(product_id=product_id)
+
+        data = []
+        for r in reviews:
+            data.append({
+                "rating": r.rating,
+                "comment": r.comment,
+                "user": "Anonymous" if r.anonymous else r.user.username,
+                "created_at": r.created_at
+            })
+
+        return Response(data)
 
 # ================= LOCAL PRODUCTS ================= #
 

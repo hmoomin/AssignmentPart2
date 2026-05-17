@@ -3,7 +3,7 @@ from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
 from django.core.exceptions import ValidationError
-from orders.models import Notification
+from orders.models import Notification, OrderItem
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -205,6 +205,16 @@ class Product(models.Model):
     def __str__(self):
         return self.name
 
+class Review(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    product = models.ForeignKey("products.Product", on_delete=models.CASCADE)
+    rating = models.IntegerField()
+    comment = models.TextField(blank=True)
+    anonymous = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.product} review by {self.user}"
 
 class Discount(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)

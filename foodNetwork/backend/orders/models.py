@@ -91,7 +91,6 @@ class OrderItem(models.Model):
     def __str__(self):
         return f"{self.product_name} x {self.quantity}"
 
-
 class Payment(models.Model):
     producer = models.ForeignKey(User, on_delete=models.CASCADE)
     orders = models.ManyToManyField(OrderItem)

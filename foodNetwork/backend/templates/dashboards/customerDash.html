@@ -264,7 +264,7 @@ function loadProducts(filters = {}) {
                     : ""
                 }
                 ${p.stock_quantity > 0 ? `In Stock: ${p.stock_quantity}` : "Out of Stock"}<br>
-                <button class="secondary" onclick="addToCart(${p.id})">Add</button>
+                <button class="secondary" onclick="addToCart(${p.id})">Add</button> <button class="secondary" onclick="reviewProduct(${p.id})"> ⭐ Review</button><br>
             `;
             list.appendChild(li);
         });
@@ -424,6 +424,30 @@ function checkout() {
         console.error("Checkout error:", err);
         alert("Order created, but payment failed. Please retry payment.");
         startPaymentPolling(); // keep checking status
+    });
+}
+
+function reviewProduct(productId) {
+    const rating = prompt("Enter rating (1-5):");
+    const comment = prompt("Enter comment:");
+    const anonymous = confirm("Submit anonymously?");
+
+    fetch("/api/products/reviews/create/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify({
+            product: productId,
+            rating: rating,
+            comment: comment,
+            anonymous: anonymous
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message || data.error);
     });
 }
 
