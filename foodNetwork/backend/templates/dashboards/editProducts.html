@@ -84,6 +84,7 @@ fetch(`/api/products/${id}/`, { credentials: "include" })
     organicInput.checked = p.is_organic;
     allergenInput.value = p.allergen_info;
     bestBeforeInput.value = p.best_before_date;
+    fromInput.value = p.available_from;
     harvestInput.value = p.harvest_date;
     toInput.value = p.available_to;
     stockInput.value = p.stock_quantity;

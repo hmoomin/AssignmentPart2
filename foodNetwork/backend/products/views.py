@@ -13,6 +13,7 @@ from django.db.models import Q
 from users.models import User
 from django.db.models import F, ExpressionWrapper, DecimalField
 from orders.models import OrderItem
+from django.shortcuts import render
 
 # ================= PRODUCTS ================= #
 class ProductListView(generics.ListAPIView):
@@ -105,6 +106,13 @@ class ProductListView(generics.ListAPIView):
 
         serializer = self.get_serializer(queryset, many=True)
         data = serializer.data
+
+        for i, product in enumerate(queryset):
+            has_purchased = OrderItem.objects.filter(
+                order__customer=request.user,
+                product=product
+            ).exists()
+            data[i]["has_purchased"] = has_purchased
 
         expired_products = queryset.filter(
             best_before_date__lt=today,
@@ -219,6 +227,9 @@ class ProductReviewListView(APIView):
             })
 
         return Response(data)
+    
+def review_page(request):
+    return render(request, "dashboards/review.html")
 
 # ================= LOCAL PRODUCTS ================= #
 

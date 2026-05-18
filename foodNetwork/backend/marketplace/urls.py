@@ -16,7 +16,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from users.views import logout_user, change_password
-from orders.views import add_product_page, add_education_page, edit_product_page, delete_product_page, edit_education_page, delete_education_page
+from orders.views import add_product_page, add_education_page, edit_product_page, delete_product_page, edit_education_page, delete_education_page, customer_dashboard_page
+from products.views import review_page
 from users.views import RegisterView, register_page, home_page
 
 urlpatterns = [
@@ -37,4 +38,6 @@ urlpatterns = [
     path("producer/delete-product/<int:pk>/", delete_product_page),
     path("producer/edit-education/<int:pk>/", edit_education_page),
     path("producer/delete-education/<int:pk>/", delete_education_page),
+    path("review/", review_page),
+    path("dashboard/customer/view/", customer_dashboard_page),
 ]

@@ -191,8 +191,14 @@ function applyFilters() {
     });
 }
 
-function loadProducts(filters = {}) {
+async function loadReviews(productId) {
+    const res = await fetch(`/api/products/reviews/${productId}/`, {
+        credentials: "include"
+    });
+    return await res.json();
+}
 
+function loadProducts(filters = {}) {
     let url = "/api/products/list/?";
 
     if (filters.search) {
@@ -231,16 +237,22 @@ function loadProducts(filters = {}) {
             return a.is_discounted ? -1 : 1;
         });
 
-        data.forEach(p => {
+        data.forEach(async (p) => {
             if (p.is_recalled) return;
+            const reviews = await loadReviews(p.id);
+            const alreadyReviewed = await hasReviewed(p.id);
+            const reviewHTML = reviews.map(r => `
+                <div style="margin-left:10px;">
+                    <strong>${r.user}</strong> ⭐${r.rating}
+                    <p>${r.comment}</p>
+                </div>
+            `).join("");
+
             let li = document.createElement("li");
             li.innerHTML = `
                 <strong style="font-size: 1.2em;">${p.name}</strong><br>
-                ${
-                    p.is_discounted
-                    ? `<span style="color:red;">
-                        🔻 ${p.discount_percentage}% OFF
-                    </span><br>`
+                ${p.is_discounted
+                    ? `<span style="color:red;">🔻 ${p.discount_percentage}% OFF</span><br>`
                     : ""
                 }
                 £${parseFloat(p.discounted_price).toFixed(2)} per ${p.unit}
@@ -251,7 +263,7 @@ function loadProducts(filters = {}) {
                     : ""
                 }
                 <br>🌍 Food Miles: ${p.food_miles !== null ? p.food_miles + " miles" : "N/A"}
-                <br>${p.allergen_info ? `<strong>⚠️ Allergens ⚠️: </strong>${p.allergen_info}` : ""}
+                <br>${p.allergen_info ? `<strong>⚠️ Allergens ⚠️:</strong> ${p.allergen_info}` : ""}
                 <br>Farm: ${p.origin_farm || p.producer_name}<br>
                 ${p.description ? "Description: " + p.description : ""}<br>
                 ${p.is_organic ? "🌱 Organic" : ""}<br>
@@ -264,11 +276,42 @@ function loadProducts(filters = {}) {
                     : ""
                 }
                 ${p.stock_quantity > 0 ? `In Stock: ${p.stock_quantity}` : "Out of Stock"}<br>
-                <button class="secondary" onclick="addToCart(${p.id})">Add</button> <button class="secondary" onclick="reviewProduct(${p.id})"> ⭐ Review</button><br>
+                <br><strong>Reviews:</strong><br>
+                ${reviewHTML || "No reviews yet"}
+                <br>
+                <button class="secondary" onclick="addToCart(${p.id})">Add</button>
+                <button class="secondary" onclick="goToReview(${p.id})"
+                    ${(!p.has_purchased || alreadyReviewed) ? "disabled style='opacity:0.5; cursor:not-allowed;'" : ""}>
+                    ${
+                        !p.has_purchased
+                        ? "Not Purchased"
+                        : alreadyReviewed
+                        ? "Reviewed"
+                        : "⭐ Write Review"
+                    }
+                </button>
+                <br>
             `;
             list.appendChild(li);
         });
     });
+}
+
+async function goToReview(productId) {
+    const reviewed = await hasReviewed(productId);
+
+    if (reviewed) {
+        alert("You have already reviewed this product.");
+        return;
+    }
+
+    window.location.href = `/review/?product=${productId}`;
+}
+
+async function hasReviewed(productId) {
+    const reviews = await loadReviews(productId);
+    const username = localStorage.getItem("username");
+    return reviews.some(r => r.user === username);
 }
 
 document.getElementById("searchBox").addEventListener("input", (e) => {
@@ -418,6 +461,7 @@ function checkout() {
             });
             alert("Payment successful!");
             refreshUI();
+            applyFilters();
         }
     })
     .catch(err => {
@@ -478,6 +522,7 @@ function checkPaymentUpdates() {
             loadOrders(); // update UI
         } else {
             stopPaymentPolling(); // stop when all paid
+            applyFilters(); 
         }
     });
 }
