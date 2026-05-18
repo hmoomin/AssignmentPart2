@@ -43,109 +43,89 @@ class CheckoutView(APIView):
 
         if not cart or not cart.items.exists():
             raise ValidationError("Cart is empty")
-
         delivery_method = request.data.get("delivery_method")
-        address = request.data.get("address")
+        address_line = request.data.get("address_line")
+        postcode = request.data.get("postcode")
         delivery_date = request.data.get("delivery_date")
-
-        if delivery_method == "delivery" and not address:
-            raise ValidationError("address required for delivery")
-
+        # VALIDATION
+        if delivery_method == "delivery":
+            if not address_line or not postcode:
+                raise ValidationError("Address and postcode required for delivery")
         if not delivery_date:
             raise ValidationError("Delivery date required")
-
-       
         delivery_date = parse_datetime(delivery_date)
-
         if not delivery_date:
             raise ValidationError("Invalid delivery date format")
-
         if is_naive(delivery_date):
             delivery_date = make_aware(delivery_date)
-
         if delivery_date <= timezone.now() + timedelta(hours=48):
             raise ValidationError("Orders must be placed at least 48 hours in advance")
-
+        # CREATE ORDER
         order = Order.objects.create(
             customer=user,
             delivery_date=delivery_date,
             status="pending",
             payment_status="processing"
         )
-
         created_items = []
-
         for item in cart.items.all():
             product = item.product
-
             if not product.is_active:
                 raise ValidationError(f"{product.name} has been recalled and cannot be ordered")
-
             if product.stock_quantity < item.quantity:
                 raise ValidationError(f"Not enough stock for {product.name}")
-
-            product = item.product
             producer = product.producer
 
-            # Get postcodes
+            # FOOD MILES CALC
             customer_postcode = user.postcode
             producer_postcode = producer.postcode
-
             lat1, lon1 = postcode_to_coords(customer_postcode)
             lat2, lon2 = postcode_to_coords(producer_postcode)
-
             if None not in (lat1, lon1, lat2, lon2):
                 food_miles = calculate_distance(lat1, lon1, lat2, lon2)
             else:
                 food_miles = None
-
+            # STOCK UPDATE
             product.stock_quantity -= item.quantity
             product.save()
-
+            # STORE ADDRESS CLEANLY
+            full_address = (
+                f"{address_line}, {postcode}"
+                if delivery_method == "delivery"
+                else ""
+            )
             order_item = OrderItem.objects.create(
                 order=order,
                 product=product,
                 product_name=product.name,
-                producer=product.producer,
-                producer_name=product.producer.username,
+                producer=producer,
+                producer_name=producer.username,
                 quantity=item.quantity,
                 price=product.discounted_price,
                 delivery_method=delivery_method,
-                delivery_notes=address if delivery_method == "delivery" else "",
-                food_miles=food_miles
+                delivery_notes=full_address,
+                food_miles=food_miles,
+                contact_name=user.contact_name or user.username,
+                contact_phone=user.phone or "",
+                contact_email=user.email or ""
             )
-
             created_items.append(order_item)
-
+            # NOTIFICATION
             Notification.objects.create(
-                    user=product.producer,
-                    message=f"New order received: {product.name} x {item.quantity}",
-                    notification_type="order"
-                )
-
-        total_amount = sum(
-            item.price * item.quantity for item in created_items
-        )
+                user=producer,
+                message=f"New order received: {product.name} x {item.quantity}",
+                notification_type="order"
+            )
+        # PAYMENT
+        total_amount = sum(item.price * item.quantity for item in created_items)
         intent = stripe.PaymentIntent.create(
-            amount=int(total_amount * 100),  # to pence
+            amount=int(total_amount * 100),
             currency="gbp",
             automatic_payment_methods={"enabled": True},
             metadata={"order_id": order.id}
         )
-
+        # CLEAR CART
         cart.items.all().delete()
-
-        grouped = defaultdict(list)
-
-        for item in created_items:
-            grouped[item.producer_name].append({
-                "product": item.product_name,
-                "quantity": item.quantity,
-                "subtotal": float(item.price * item.quantity),
-                "delivery": item.delivery_method,
-                "food_miles": item.food_miles
-            })
-
         return Response({
             "client_secret": intent.client_secret,
             "order_id": order.id,
@@ -463,7 +443,9 @@ class ProducerOrdersView(APIView):
 
     def get(self, request):
         producer = request.user
-        items = OrderItem.objects.filter(producer=producer).select_related("order")
+        items = OrderItem.objects.filter(
+            producer=producer
+        ).select_related("order", "order__customer")
 
         grouped = {}
         total_sales = 0
@@ -474,6 +456,9 @@ class ProducerOrdersView(APIView):
             if order_id not in grouped:
                 grouped[order_id] = {
                     "date": item.order.created_at,
+                    "customer_name": item.contact_name,
+                    "customer_phone": item.contact_phone,
+                    "customer_email": item.contact_email,
                     "items": [],
                     "total": 0
                 }
@@ -488,6 +473,9 @@ class ProducerOrdersView(APIView):
                 "delivery_time": item.delivery_time.isoformat() if item.delivery_time else None,
                 "delivery_method": item.delivery_method,
                 "delivery_notes": item.delivery_notes,
+                "customer_name": item.contact_name,
+                "customer_phone": item.contact_phone,
+                "customer_email": item.contact_email,
                 "subtotal": subtotal
             })
 

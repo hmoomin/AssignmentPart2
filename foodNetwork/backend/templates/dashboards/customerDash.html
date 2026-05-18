@@ -423,7 +423,8 @@ function checkout() {
         body: JSON.stringify({
             delivery_date: date.toISOString().slice(0, 19),
             delivery_method: method,
-            address: address
+            address_line: addressLine,
+            postcode: postcode
         })
     })
     .then(async res => {

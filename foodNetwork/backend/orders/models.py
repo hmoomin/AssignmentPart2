@@ -69,6 +69,10 @@ class OrderItem(models.Model):
     # Sustainability
     food_miles = models.FloatField(null=True, blank=True)
 
+    contact_name = models.CharField(max_length=255)
+    contact_phone = models.CharField(max_length=20, blank=True, null=True)
+    contact_email = models.EmailField(blank=True, null=True)
+
     STATUS_PENDING = "pending"
     STATUS_SHIPPED = "shipped"
 

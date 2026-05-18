@@ -217,6 +217,8 @@ function loadProducerOrders() {
                 <strong>Order #${orderId}</strong><br>
                 Date: ${order.date ? new Date(order.date).toLocaleString() : "N/A"}<br>
                 Customer: ${order.customer_name || "N/A"}<br>
+                Phone: ${order.customer_phone || "N/A"}<br>
+                Email: ${order.customer_email || "N/A"}<br>
                 <ul>
                     ${(order.items || []).map(i => `
                         <li>
