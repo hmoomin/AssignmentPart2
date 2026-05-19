@@ -22,6 +22,23 @@
     <ul id="orderUpdates"></ul>
 </div>
 
+<div id="contentModal" style="
+    display:none;
+    position:fixed;
+    top:20%;
+    left:50%;
+    transform:translateX(-50%);
+    background:white;
+    padding:20px;
+    border:1px solid #ccc;
+    z-index:1000;
+    width:300px;
+">
+    <h3 id="modalTitle"></h3>
+    <p id="modalContent"></p>
+    <button onclick="closeModal()">Close</button>
+</div>
+
 <div class="card">
     <div class="filters">
 
@@ -299,12 +316,10 @@ function loadProducts(filters = {}) {
 
 async function goToReview(productId) {
     const reviewed = await hasReviewed(productId);
-
     if (reviewed) {
         alert("You have already reviewed this product.");
         return;
     }
-
     window.location.href = `/review/?product=${productId}`;
 }
 
@@ -545,16 +560,52 @@ function loadOrderUpdates() {
                 style = "color:green;";
             }
             li.innerHTML = `
-                <div style="${style}">
-                    ${n.message}
-                </div>
-                <small>${new Date(n.created_at).toLocaleString()}</small>
+                ${n.message}
+                <br><small>${new Date(n.created_at).toLocaleString()}</small>
                 <br>
-                <button onclick="markOneRead(${n.id})">Mark as read</button>
+                ${n.content_id ? `
+                    <button onclick="viewContent(${n.content_id}, ${n.id})">
+                        View
+                    </button>
+                ` : ""}
+                <button onclick="markOneRead(${n.id})">
+                    Mark as read
+                </button>
             `;
             list.appendChild(li);
         });
     });
+}
+
+function viewContent(contentId, notificationId) {
+    fetch(`/api/products/education/${contentId}/`, {
+        credentials: "include"
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        // Show content
+        showContentModal(data);
+
+        // Mark as read automatically
+        return fetch(`/api/orders/notifications/${notificationId}/read/`, {
+            method: "PATCH",
+            headers: {
+                "X-CSRFToken": getCSRFToken()
+            }
+        });
+    })
+    .then(() => loadOrderUpdates());
+}
+
+function showContentModal(data) {
+    document.getElementById("modalTitle").innerText = data.title;
+    document.getElementById("modalContent").innerText = data.content;
+    document.getElementById("contentModal").style.display = "block";
+}
+
+function closeModal() {
+    document.getElementById("contentModal").style.display = "none";
 }
 
 function markOneRead(notificationId) {

@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import CartItemCreateView, CartItemListView, CheckoutView, CustomerDashboardView, EnvironmentalReportView, producer_dashboard_page, customer_dashboard_page, edit_product_page, delete_product_page, edit_education_page, delete_education_page, ProducerNotificationsView, CartItemUpdateView, CustomerNotificationsView, UpdateOrderItemView, ProducerOrdersView, MarkNotificationReadView, SafetyAlertView, ResolveProductView, DisableProductView, WeeklySettlementView, ConfirmPaymentView, ReorderView
+from .views import CartItemCreateView, CartItemListView, CheckoutView, CustomerDashboardView, EnvironmentalReportView, producer_dashboard_page, customer_dashboard_page, edit_product_page, delete_product_page, edit_education_page, delete_education_page, ProducerNotificationsView, CartItemUpdateView, CustomerNotificationsView, UpdateOrderItemView, ProducerOrdersView, MarkNotificationReadView, SafetyAlertView, ResolveProductView, DisableProductView, WeeklySettlementView, ConfirmPaymentView, ReorderView, ShareEducationalContentView
 
 urlpatterns = [
     # Order Items
@@ -32,4 +32,5 @@ urlpatterns = [
     path("producer/products/delete/<int:id>/", delete_product_page),
     path("producer/education/edit/<int:id>/", edit_education_page),
     path("producer/education/delete/<int:id>/", delete_education_page),
+    path("share-content/<int:pk>/", ShareEducationalContentView.as_view()),
 ]

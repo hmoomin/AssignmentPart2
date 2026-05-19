@@ -109,6 +109,13 @@ class Notification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.TextField()
 
+    content = models.ForeignKey(
+        "products.EducationalContent",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
     notification_type = models.CharField(
         max_length=20,
         choices=[

@@ -167,7 +167,8 @@ class CustomerNotificationsView(APIView):
                 "created_at": n.created_at,
                 "is_read": n.is_read,
                 "notification_type": n.notification_type,
-                "severity": n.severity
+                "severity": n.severity,
+                "content_id": n.content.id if n.content else None
             }
             for n in notifications
         ])
@@ -213,7 +214,7 @@ class SafetyAlertView(APIView):
             product.status = "recalled"
             product.save()
         # PRODUCT RECALL (AUTO DISABLE)
-        product.is_active = False   # or is_available = False depending on your model
+        product.is_active = False
         product.save()
 
         # FIND AFFECTED CUSTOMERS
@@ -628,6 +629,31 @@ class EnvironmentalReportView(APIView):
         writer.writerow(["TOTAL MILES", round(total_miles, 2)])
         writer.writerow(["TOTAL CO2 (kg)", round(total_co2, 2)])
         return response
+    
+class ShareEducationalContentView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, pk):
+        user = request.user
+        if not user.is_producer:
+            raise ValidationError("Only producers can share content")
+        content = get_object_or_404(
+            EducationalContent,
+            pk=pk,
+            producer=user
+        )
+        # Get all customers (who have ordered from this producer)
+        customers = set(
+            item.order.customer
+            for item in OrderItem.objects.filter(producer=user)
+        )
+        for customer in customers:
+            Notification.objects.create(
+                user=customer,
+                message=f"📢 New {content.content_type.title()} added: {content.title}",
+                notification_type="normal",
+                content=content 
+            )
+        return Response({"message": "Content shared successfully"})
     
 class CustomerDashboardView(APIView):
     def get(self, request):

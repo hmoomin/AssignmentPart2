@@ -541,6 +541,7 @@ fetch("/api/products/education/", { credentials: "include" })
             <a href="/producer/edit-education/${item.id}/">
                 <button class="secondary">Edit</button>
             </a>
+            <button onclick="shareContent(${item.id})">Share</button>
             <a href="/producer/delete-education/${item.id}/">
                 <button class="secondary">Delete</button>
             </a>
@@ -548,6 +549,17 @@ fetch("/api/products/education/", { credentials: "include" })
         list.appendChild(li);
     });
 });
+
+function shareContent(id) {
+    fetch(`/api/orders/share-content/${id}/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    })
+    .then(() => alert("Content shared with customers"));
+}
+
 setInterval(loadProducerOrders, 50000); // refresh every 50s
 setInterval(loadNotifications, 5000); // refresh every 5s
 </script>

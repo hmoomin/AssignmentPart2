@@ -14,6 +14,7 @@ from users.models import User
 from django.db.models import F, ExpressionWrapper, DecimalField
 from orders.models import OrderItem
 from django.shortcuts import render
+from django.shortcuts import get_object_or_404
 
 # ================= PRODUCTS ================= #
 class ProductListView(generics.ListAPIView):
@@ -311,20 +312,20 @@ class EducationalContentListCreateView(generics.ListCreateAPIView):
         serializer.save(producer=self.request.user)
 
 
-class EducationalContentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = EducationalContentSerializer
+class EducationalContentDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        return EducationalContent.objects.filter(
-            producer=self.request.user
+    def get(self, request, pk):
+        content = get_object_or_404(
+            EducationalContent,
+            pk=pk,
+            producer__in=User.objects.filter(
+                orderitem__order__customer=request.user
+            )
         )
 
-    def perform_update(self, serializer):
-        serializer.save()
-
-    def perform_destroy(self, instance):
-        instance.delete()
+        serializer = EducationalContentSerializer(content)
+        return Response(serializer.data)
 
 class EducationalContentListView(generics.ListAPIView):
     serializer_class = EducationalContentSerializer

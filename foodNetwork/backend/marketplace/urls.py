@@ -21,23 +21,26 @@ from products.views import review_page
 from users.views import RegisterView, register_page, home_page
 
 urlpatterns = [
-    path("", home_page),
-    path("change-password/", change_password),
-    path("", include("users.urls")),
     path('admin/', admin.site.urls),
-    path("api/", include("orders.urls")),
+    # API
     path('api/products/', include('products.urls')),
     path('api/orders/', include('orders.urls')),
     path('api-auth/', include('rest_framework.urls')),
-    path("register/", register_page, name="register"),
-    path("api/register/", RegisterView.as_view(), name="api-register"),
+    # Users / pages
+    path("", include("users.urls")),
+    path("home/", home_page),
+    path("register/", register_page),
+    path("api/register/", RegisterView.as_view()),
     path("logout/", logout_user),
+    path("change-password/", change_password),
+    # dashboards
     path("producer/add-product/", add_product_page),
     path("producer/add-education/", add_education_page),
     path("producer/edit-product/<int:pk>/", edit_product_page),
     path("producer/delete-product/<int:pk>/", delete_product_page),
     path("producer/edit-education/<int:pk>/", edit_education_page),
     path("producer/delete-education/<int:pk>/", delete_education_page),
+
     path("review/", review_page),
     path("dashboard/customer/view/", customer_dashboard_page),
 ]
