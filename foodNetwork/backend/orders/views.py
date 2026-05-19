@@ -5,7 +5,7 @@ from rest_framework import generics
 from .serializers import CartItemSerializer, OrderItemSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Cart, Order, OrderItem, CartItem, Notification
+from .models import Cart, Order, OrderItem, CartItem, Notification, RecurringOrderItem, RecurringOrder
 from users.models import User
 from products.utils import calculate_distance, postcode_to_coords
 from rest_framework.exceptions import ValidationError
@@ -41,6 +41,11 @@ class CheckoutView(APIView):
         user = request.user
         cart = Cart.objects.filter(user=user).first()
 
+        if user.is_community_group:
+            for item in cart.items.all():
+                if item.quantity > 100: 
+                    raise ValidationError("Bulk quantity exceeds allowed limit for this product")
+
         if not cart or not cart.items.exists():
             raise ValidationError("Cart is empty")
         delivery_method = request.data.get("delivery_method")
@@ -60,12 +65,17 @@ class CheckoutView(APIView):
             delivery_date = make_aware(delivery_date)
         if delivery_date <= timezone.now() + timedelta(hours=48):
             raise ValidationError("Orders must be placed at least 48 hours in advance")
+        
+        is_bulk = request.data.get("is_bulk_order", False)
+        instructions = request.data.get("instructions", "")
         # CREATE ORDER
         order = Order.objects.create(
             customer=user,
             delivery_date=delivery_date,
             status="pending",
-            payment_status="processing"
+            payment_status="processing",
+            is_bulk_order=is_bulk,
+            special_instructions=instructions
         )
         created_items = []
         for item in cart.items.all():
@@ -111,9 +121,17 @@ class CheckoutView(APIView):
             )
             created_items.append(order_item)
             # NOTIFICATION
+            message = f"New order: {product.name} x {item.quantity}"
+
+            if is_bulk:
+                message = f"📦 BULK ORDER: {product.name} x {item.quantity}"
+
+            if instructions:
+                message += f" | Notes: {instructions}"
+
             Notification.objects.create(
                 user=producer,
-                message=f"New order received: {product.name} x {item.quantity}",
+                message=message,
                 notification_type="order"
             )
         # PAYMENT
@@ -387,6 +405,26 @@ class ReorderView(APIView):
             "added": added,
             "failed": failed
         })
+    
+class CreateRecurringOrderView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        user = request.user
+        cart = Cart.objects.filter(user=user).first()
+        if not cart or not cart.items.exists():
+            raise ValidationError("Cart is empty")
+        recurring = RecurringOrder.objects.create(
+            customer=user,
+            day_of_week=request.data.get("day_of_week"),
+            delivery_day_offset=request.data.get("delivery_offset", 2)
+        )
+        for item in cart.items.all():
+            RecurringOrderItem.objects.create(
+                recurring_order=recurring,
+                product=item.product,
+                quantity=item.quantity
+            )
+        return Response({"message": "Recurring order created"})
 
 class UpdateOrderItemView(APIView):
     permission_classes = [IsAuthenticated]

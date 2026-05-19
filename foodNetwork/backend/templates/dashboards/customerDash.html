@@ -108,6 +108,13 @@
 
     <input type="text" id="addressLine" placeholder="Enter address" style="display:none;">
     <input type="text" id="postcode" placeholder="Enter postcode" style="display:none;">
+    <textarea id="instructions" placeholder="Special delivery instructions"></textarea><br>
+    <div class="batch-options">
+        <input type="checkbox" id="bulkOrder">
+        <label for="bulkOrder">Bulk Order</label>
+        <input type="checkbox" id="recurring">
+        <label for="recurring">Weekly Order</label>
+    </div><br>
     <div id="card-element" style="padding:10px;border:1px solid #ccc;"></div><br>
     <button class="secondary" onclick="checkout()">Checkout</button>
 </div>
@@ -145,7 +152,6 @@ let stripe;
 let card;
 
 document.addEventListener("DOMContentLoaded", () => {
-    loadFilters(); 
     loadFilterOptions();
     loadProducts({
         search: "",
@@ -171,30 +177,6 @@ function getCSRFToken() {
         .split("; ")
         .find(row => row.startsWith("csrftoken"))
         ?.split("=")[1];
-}
-
-function loadFilters() {
-    fetch("/api/products/filters/")
-    .then(res => res.json())
-    .then(data => {
-
-        const categorySelect = document.getElementById("categoryFilter");
-        const producerSelect = document.getElementById("producerFilter");
-
-        data.categories.forEach(c => {
-            let option = document.createElement("option");
-            option.value = c;
-            option.textContent = c;
-            categorySelect.appendChild(option);
-        });
-
-        data.producers.forEach(p => {
-            let option = document.createElement("option");
-            option.value = p;
-            option.textContent = p;
-            producerSelect.appendChild(option);
-        });
-    });
 }
 
 function applyFilters() {
@@ -368,7 +350,7 @@ function loadFilterOptions() {
 function addToCart(productId) {
     // instantly update UI (fake)
     console.log("Adding instantly...");
-    fetch("/api/cart/items/", {
+    fetch("/api/orders/cart/items/", {
         method: "POST",
         credentials: "include",
         headers: {
@@ -384,8 +366,9 @@ function addToCart(productId) {
 }
 
 function updateQuantity(itemId, change) {
-    fetch(`/api/cart/items/${itemId}/`, {
+    fetch(`/api/orders/cart/items/${itemId}/`, {
         method: "PATCH",
+        credentials: "include",
         headers: {
             "Content-Type": "application/json",
             "X-CSRFToken": getCSRFToken()
@@ -421,6 +404,9 @@ function checkout() {
     const addressLine = document.getElementById("addressLine").value;
     const postcode = document.getElementById("postcode").value;
     const address = `${addressLine} ${postcode}`.trim();
+    const isBulk = document.getElementById("bulkOrder").checked;
+    const instructions = document.getElementById("instructions").value;
+    const isRecurring = document.getElementById("recurring").checked;
 
     if (method === "delivery" && (!addressLine || !postcode)) {
         alert("Please enter a address for delivery");
@@ -428,7 +414,26 @@ function checkout() {
     }
     let date = new Date();
     date = new Date(date.getTime() + (49 * 60 * 60 * 1000)); // 49 hours ahead
-    fetch("/api/checkout/", {
+    if (isRecurring) {
+        fetch("/api/orders/recurring/create/", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCSRFToken()
+            },
+            body: JSON.stringify({
+                day_of_week: new Date().getDay(),
+                delivery_offset: 2
+            })
+        })
+        .then(() => {
+            alert("Recurring order set!");
+            return;
+        });
+        return;
+    }
+    fetch("/api/orders/checkout/", {
         method: "POST",
         credentials: "include",
         headers: {
@@ -439,7 +444,9 @@ function checkout() {
             delivery_date: date.toISOString().slice(0, 19),
             delivery_method: method,
             address_line: addressLine,
-            postcode: postcode
+            postcode: postcode,
+            is_bulk_order: isBulk,
+            instructions: instructions
         })
     })
     .then(async res => {
@@ -450,7 +457,7 @@ function checkout() {
             return data;
         } catch (e) {
             console.error("RAW RESPONSE:", text);
-            throw data;
+            throw new Error("Checkout failed");
         }
     })
     .then(async data => {
@@ -494,6 +501,7 @@ function reviewProduct(productId) {
 
     fetch("/api/products/reviews/create/", {
         method: "POST",
+        credentials: "include",
         headers: {
             "Content-Type": "application/json",
             "X-CSRFToken": getCSRFToken()
@@ -590,6 +598,7 @@ function viewContent(contentId, notificationId) {
         // Mark as read automatically
         return fetch(`/api/orders/notifications/${notificationId}/read/`, {
             method: "PATCH",
+            credentials: "include",
             headers: {
                 "X-CSRFToken": getCSRFToken()
             }
@@ -611,6 +620,7 @@ function closeModal() {
 function markOneRead(notificationId) {
     fetch(`/api/orders/notifications/${notificationId}/read/`, {
         method: "PATCH",
+        credentials: "include",
         headers: {
             "X-CSRFToken": getCSRFToken()
         }
@@ -680,6 +690,7 @@ function loadOrders() {
 function reorder(orderId) {
     fetch(`/api/orders/reorder/${orderId}/`, {
         method: "POST",
+        credentials: "include",
         headers: {
             "X-CSRFToken": getCSRFToken()
         }
@@ -733,6 +744,7 @@ function formatPayment(status) {
 function markNotificationsRead() {
     fetch("/api/orders/notifications/read/", {
         method: "PATCH",
+        credentials: "include",
         headers: {
             "X-CSRFToken": getCSRFToken()
         }

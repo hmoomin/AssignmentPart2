@@ -10,6 +10,8 @@ class User(AbstractUser):
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     is_producer = models.BooleanField(default=False)
+    is_community_group = models.BooleanField(default=False)
+    is_restaurant = models.BooleanField(default=False)
     business_name = models.CharField(max_length=255, blank=True)
     contact_name = models.CharField(max_length=255, blank=True)
     email = models.EmailField(unique=True)

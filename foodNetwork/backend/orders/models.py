@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 
+
 User = settings.AUTH_USER_MODEL
 
 class Cart(models.Model):
@@ -25,6 +26,17 @@ class Order(models.Model):
     paid_at = models.DateTimeField(null=True, blank=True)
     # Payment
     payment_status = models.CharField(max_length=20, default="processing")
+
+    is_bulk_order = models.BooleanField(default=False)
+    special_instructions = models.TextField(blank=True)
+
+    is_recurring_instance = models.BooleanField(default=False)
+    recurring_parent = models.ForeignKey(
+        "RecurringOrder",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+    )
 
     STATUS_PENDING = "pending"
     STATUS_PAID = "paid"
@@ -94,6 +106,18 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f"{self.product_name} x {self.quantity}"
+
+class RecurringOrder(models.Model):
+    customer = models.ForeignKey(User, on_delete=models.CASCADE)
+    day_of_week = models.IntegerField()  # 0 = Monday
+    delivery_day_offset = models.IntegerField(default=2)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class RecurringOrderItem(models.Model):
+    recurring_order = models.ForeignKey(RecurringOrder, related_name="items", on_delete=models.CASCADE)
+    product = models.ForeignKey("products.Product", on_delete=models.SET_NULL, null=True)
+    quantity = models.IntegerField()
 
 class Payment(models.Model):
     producer = models.ForeignKey(User, on_delete=models.CASCADE)
