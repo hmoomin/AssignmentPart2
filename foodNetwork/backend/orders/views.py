@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import Cart, Order, OrderItem, CartItem, Notification, RecurringOrderItem, RecurringOrder
 from users.models import User
+from rest_framework.decorators import api_view, permission_classes
 from products.utils import calculate_distance, postcode_to_coords
 from rest_framework.exceptions import ValidationError
 from products.models import Product, EducationalContent
@@ -30,6 +31,8 @@ from django.utils.timezone import make_aware, is_naive
 from decimal import Decimal
 import csv
 from django.http import HttpResponse
+from django.db.models.functions import TruncMonth
+from datetime import date
 
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -68,6 +71,7 @@ class CheckoutView(APIView):
         
         is_bulk = request.data.get("is_bulk_order", False)
         instructions = request.data.get("instructions", "")
+
         # CREATE ORDER
         order = Order.objects.create(
             customer=user,
@@ -136,6 +140,12 @@ class CheckoutView(APIView):
             )
         # PAYMENT
         total_amount = sum(item.price * item.quantity for item in created_items)
+        commission = total_amount * Decimal("0.05")
+        net = total_amount - commission
+        order.total_amount = total_amount
+        order.commission_amount = commission
+        order.net_amount = net
+        order.save()
         intent = stripe.PaymentIntent.create(
             amount=int(total_amount * 100),
             currency="gbp",
@@ -602,6 +612,105 @@ class WeeklySettlementView(APIView):
                 "items_count": len(items),
                 "breakdown": breakdown
             })
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def commission_report(request):
+    start = request.GET.get("start")
+    end = request.GET.get("end")
+    orders = Order.objects.all()
+    # Date filtering
+    if start and end:
+        orders = orders.filter(created_at__date__range=[start, end])
+    # Core totals
+    totals = orders.aggregate(
+        total_order_value=Sum("total_amount"),
+        total_commission=Sum("commission_amount"),
+        total_net=Sum("net_amount"),
+        order_count=Count("id")
+    )
+    # Monthly summary 
+    monthly = (
+        orders.annotate(month=TruncMonth("created_at"))
+        .values("month")
+        .annotate(
+            total=Sum("total_amount"),
+            commission=Sum("commission_amount"),
+            net=Sum("net_amount"),
+            orders=Count("id")
+        )
+        .order_by("month")
+    )
+    # Year-to-date 
+    year_start = date.today().replace(month=1, day=1)
+    ytd_orders = Order.objects.filter(created_at__date__gte=year_start)
+    ytd = ytd_orders.aggregate(
+        total=Sum("total_amount"),
+        commission=Sum("commission_amount"),
+        net=Sum("net_amount"),
+        orders=Count("id")
+    )
+    # Order breakdown
+    order_list = list(orders.values(
+        "id",
+        "total_amount",
+        "commission_amount",
+        "net_amount",
+        "created_at"
+    ))
+    return Response({
+        "summary": {
+            "total_order_value": totals["total_order_value"] or 0,
+            "total_commission": totals["total_commission"] or 0,
+            "total_net": totals["total_net"] or 0,
+            "order_count": totals["order_count"] or 0,
+        },
+        "orders": order_list,
+        "monthly_summary": list(monthly),
+        "year_to_date": {
+            "total": ytd["total"] or 0,
+            "commission": ytd["commission"] or 0,
+            "net": ytd["net"] or 0,
+            "orders": ytd["orders"] or 0,
+        }
+    })
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def commission_order_detail(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    items = order.items.all()
+    return Response({
+        "order_total": float(order.total_amount or 0),
+        "commission": float(order.commission_amount or 0),
+        "net": float(order.net_amount or 0),
+        "items": [
+            {
+                "producer": item.producer.username,
+                "subtotal": float(item.price * item.quantity),
+                "payment": float(item.price * item.quantity * Decimal("0.95"))
+            }
+            for item in items
+        ]
+    })
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def export_commission_csv(request):
+    orders = Order.objects.all()
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = "attachment; filename=commission_report.csv"
+    writer = csv.writer(response)
+    writer.writerow(["Order ID", "Total", "Commission", "Net", "Date"])
+    for o in orders:
+        writer.writerow([
+            o.id,
+            o.total_amount,
+            o.commission_amount,
+            o.net_amount,
+            o.created_at
+        ])
+    return response
 
 class EnvironmentalReportView(APIView):
     permission_classes = [IsAuthenticated]

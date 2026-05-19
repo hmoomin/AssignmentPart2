@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import CartItemCreateView, CartItemListView, CheckoutView, CustomerDashboardView, EnvironmentalReportView, producer_dashboard_page, customer_dashboard_page, edit_product_page, delete_product_page, edit_education_page, delete_education_page, ProducerNotificationsView, CartItemUpdateView, CustomerNotificationsView, UpdateOrderItemView, ProducerOrdersView, MarkNotificationReadView, SafetyAlertView, ResolveProductView, DisableProductView, WeeklySettlementView, ConfirmPaymentView, ReorderView, ShareEducationalContentView
+from .views import CartItemCreateView, CartItemListView, CheckoutView, CustomerDashboardView, EnvironmentalReportView, producer_dashboard_page, customer_dashboard_page, edit_product_page, delete_product_page, edit_education_page, delete_education_page, ProducerNotificationsView, CartItemUpdateView, CustomerNotificationsView, UpdateOrderItemView, ProducerOrdersView, MarkNotificationReadView, SafetyAlertView, ResolveProductView, DisableProductView, WeeklySettlementView, ConfirmPaymentView, ReorderView, ShareEducationalContentView, commission_report, commission_order_detail, export_commission_csv
 
 urlpatterns = [
     # Order Items
@@ -24,6 +24,9 @@ urlpatterns = [
     # Reports
     path("report/<int:order_id>/", EnvironmentalReportView.as_view()),
     path("settlements/weekly/", WeeklySettlementView.as_view()),
+    path("reports/commission/", commission_report),
+    path("reports/commission/<int:order_id>/", commission_order_detail),
+    path("reports/commission/export/", export_commission_csv),
     # Views (HTML)
     path("dashboard/producer/view/", producer_dashboard_page),
     path("dashboard/customer/view/", customer_dashboard_page),

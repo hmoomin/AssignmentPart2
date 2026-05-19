@@ -18,10 +18,10 @@ from django.urls import path, include
 from users.views import logout_user, change_password
 from orders.views import add_product_page, add_education_page, edit_product_page, delete_product_page, edit_education_page, delete_education_page, customer_dashboard_page
 from products.views import review_page
-from users.views import RegisterView, register_page, home_page
+from users.views import RegisterView, register_page, home_page, admin_redirect, login_view
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('admin/', admin_redirect),
     # API
     path('api/products/', include('products.urls')),
     path('api/orders/', include('orders.urls')),

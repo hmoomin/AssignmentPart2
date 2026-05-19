@@ -98,6 +98,9 @@ def home_page(request):
         return redirect("/api/orders/dashboard/customer/view/")
     return render(request, "dashboards/home.html")
 
+def admin_redirect(request):
+    return render(request, "dashboards/admin.html")
+
 @csrf_protect
 def login_view(request):
     if request.method == "POST":

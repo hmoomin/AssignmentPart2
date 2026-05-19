@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from decimal import Decimal
 
 
 User = settings.AUTH_USER_MODEL
@@ -26,6 +27,11 @@ class Order(models.Model):
     paid_at = models.DateTimeField(null=True, blank=True)
     # Payment
     payment_status = models.CharField(max_length=20, default="processing")
+
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("5.00"))
+    commission_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    net_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
 
     is_bulk_order = models.BooleanField(default=False)
     special_instructions = models.TextField(blank=True)
@@ -77,6 +83,7 @@ class OrderItem(models.Model):
     # Accounting etc
     is_settled = models.BooleanField(default=False)
     settled_at = models.DateTimeField(null=True, blank=True)
+    producer_payment = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
 
     # Sustainability
     food_miles = models.FloatField(null=True, blank=True)

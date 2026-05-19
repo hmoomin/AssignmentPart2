@@ -1,0 +1,68 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
+<body>
+    <div style="background:#2c3e50;color:white;padding:15px;">
+    <span> Welcome {{ request.user.username }}</span>
+    <a href="/change-password/" style="margin-left:20px;color:white;">
+    Change Password
+    </a>
+    <a href="/logout/" style="float:right;color:white;">Logout</a>
+    </div>
+    <h2>Network Commission Report</h2>
+    <input type="date" id="start">
+    <input type="date" id="end">
+    <button onclick="loadReport()">Generate</button>
+    <button onclick="downloadCSV()">Download CSV</button>
+    <div id="summary"></div>
+    <ul id="orders"></ul>
+
+{% comment %} SCRIPT {% endcomment %}
+<script>
+    function loadReport() {
+    const start = document.getElementById("start").value;
+    const end = document.getElementById("end").value;
+
+    fetch(`/api/orders/reports/commission/?start=${start}&end=${end}`)
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("summary").innerHTML = `
+            Total Value: £${data.summary.total_order_value}<br>
+            Commission: £${data.summary.total_commission}<br>
+            Net: £${data.summary.total_net}<br>
+            Orders: ${data.summary.order_count}
+        `;
+
+        const list = document.getElementById("orders");
+        list.innerHTML = "";
+
+        data.orders.forEach(o => {
+            const li = document.createElement("li");
+            li.innerHTML = `
+                Order #${o.id} - £${o.total_amount}
+                <button onclick="viewOrder(${o.id})">View</button>
+            `;
+            list.appendChild(li);
+        });
+    });
+}
+
+function viewOrder(id) {
+    fetch(`/api/orders/reports/commission/${id}/`)
+    .then(res => res.json())
+    .then(data => {
+        alert(JSON.stringify(data, null, 2));
+    });
+}
+
+function downloadCSV() {
+    window.location.href = "/api/orders/reports/commission/export/";
+}
+</script>
+</body>
+</html>
