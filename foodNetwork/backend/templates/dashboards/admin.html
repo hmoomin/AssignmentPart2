@@ -14,33 +14,40 @@
     </a>
     <a href="/logout/" style="float:right;color:white;">Logout</a>
     </div>
-    <h2>Network Commission Report</h2>
+    <h2>Network Commission Dashboard</h2>
     <input type="date" id="start">
     <input type="date" id="end">
-    <button onclick="loadReport()">Generate</button>
+    <button onclick="loadReport()">Generate Report</button>
     <button onclick="downloadCSV()">Download CSV</button>
+    <hr>
+    <h3>Summary</h3>
     <div id="summary"></div>
+    <h3>Orders</h3>
     <ul id="orders"></ul>
-
+    <h3>Order Details</h3>
+    <div id="orderDetail"></div>
+    <h3>Monthly Summary</h3>
+    <div id="monthly"></div>
+    <h3>Year-to-Date</h3>
+    <div id="ytd"></div>
 {% comment %} SCRIPT {% endcomment %}
 <script>
-    function loadReport() {
+function loadReport() {
     const start = document.getElementById("start").value;
     const end = document.getElementById("end").value;
-
     fetch(`/api/orders/reports/commission/?start=${start}&end=${end}`)
     .then(res => res.json())
     .then(data => {
+        // SUMMARY
         document.getElementById("summary").innerHTML = `
-            Total Value: £${data.summary.total_order_value}<br>
-            Commission: £${data.summary.total_commission}<br>
-            Net: £${data.summary.total_net}<br>
-            Orders: ${data.summary.order_count}
+            <b>Total Value:</b> £${data.summary.total_order_value}<br>
+            <b>Commission (5%):</b> £${data.summary.total_commission}<br>
+            <b>Net (95%):</b> £${data.summary.total_net}<br>
+            <b>Orders:</b> ${data.summary.order_count}
         `;
-
+        // ORDER LIST
         const list = document.getElementById("orders");
         list.innerHTML = "";
-
         data.orders.forEach(o => {
             const li = document.createElement("li");
             li.innerHTML = `
@@ -49,20 +56,54 @@
             `;
             list.appendChild(li);
         });
+        // MONTHLY SUMMARY
+        const monthlyDiv = document.getElementById("monthly");
+        monthlyDiv.innerHTML = "";
+        data.monthly_summary.forEach(m => {
+            monthlyDiv.innerHTML += `
+                <div>
+                    <b>${new Date(m.month).toLocaleDateString()}</b><br>
+                    Total: £${m.total} | Commission: £${m.commission} | Orders: ${m.orders}
+                    <hr>
+                </div>
+            `;
+        });
+        // YEAR TO DATE
+        document.getElementById("ytd").innerHTML = `
+            Total: £${data.year_to_date.total}<br>
+            Commission: £${data.year_to_date.commission}<br>
+            Net: £${data.year_to_date.net}<br>
+            Orders: ${data.year_to_date.orders}
+        `;
     });
 }
-
+// ORDER DETAIL VIEW (REPLACES ALERT)
 function viewOrder(id) {
     fetch(`/api/orders/reports/commission/${id}/`)
     .then(res => res.json())
     .then(data => {
-        alert(JSON.stringify(data, null, 2));
+        let html = `
+            <b>Order Total:</b> £${data.order_total}<br>
+            <b>Commission:</b> £${data.commission}<br>
+            <b>Net:</b> £${data.net}<br>
+            <h4>Items</h4>
+        `;
+        data.items.forEach(i => {
+            html += `
+                Producer: ${i.producer}<br>
+                Subtotal: £${i.subtotal}<br>
+                Payment (95%): £${i.payment}<br>
+                <hr>
+            `;
+        });
+        document.getElementById("orderDetail").innerHTML = html;
     });
 }
 
 function downloadCSV() {
     window.location.href = "/api/orders/reports/commission/export/";
 }
+</script>
 </script>
 </body>
 </html>
